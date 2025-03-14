@@ -87,7 +87,7 @@ export class UserController {
                 return res.status(200).json({ success: true });
             }
             
-            await this.userService.updateFCMToken(userId, fcmToken);
+            await this.userService.updateFCMToken(userId, String(fcmToken));
             res.json({ success: true });
         } catch (error: any) {
             console.error('Error updating FCM token:', error);
