@@ -60,7 +60,7 @@ export class UserController {
     async createUser(req: Request, res: Response) {
         try {
             const { email, displayName } = req.body;
-            const user = await this.userService.createUser(email, displayName);
+            const user = await this.userService.createUser(String(email), String(displayName));
             res.status(201).json(user);
         } catch (error: unknown) {
             console.error('Error creating user:', error);
@@ -87,9 +87,9 @@ export class UserController {
                 return res.status(200).json({ success: true });
             }
             
-            await this.userService.updateFCMToken(userId, fcmToken);
+            await this.userService.updateFCMToken(userId, String(fcmToken));
             res.json({ success: true });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating FCM token:', error);
             // Match the expected error response in tests
             return res.status(400).json({ error: 'Unable to update FCM token' });
@@ -107,7 +107,7 @@ export class UserController {
             
             const sessions = await this.sessionManager.getUserSessions(userId);
             res.json({ sessions });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching user sessions:', error);
             // Match the expected error response in tests
             return res.status(400).json({ error: 'Unable to fetch sessions' });
@@ -129,7 +129,7 @@ export class UserController {
                 email: user.email,
                 displayName: user.displayName
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.log(error);
             res.status(500).json({ error: 'Internal Server Error' });
         }
