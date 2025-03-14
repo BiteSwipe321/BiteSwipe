@@ -89,7 +89,7 @@ export class UserController {
             
             await this.userService.updateFCMToken(userId, String(fcmToken));
             res.json({ success: true });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating FCM token:', error);
             // Match the expected error response in tests
             return res.status(400).json({ error: 'Unable to update FCM token' });
@@ -107,7 +107,7 @@ export class UserController {
             
             const sessions = await this.sessionManager.getUserSessions(userId);
             res.json({ sessions });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching user sessions:', error);
             // Match the expected error response in tests
             return res.status(400).json({ error: 'Unable to fetch sessions' });
@@ -129,7 +129,7 @@ export class UserController {
                 email: user.email,
                 displayName: user.displayName
             });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.log(error);
             res.status(500).json({ error: 'Internal Server Error' });
         }
