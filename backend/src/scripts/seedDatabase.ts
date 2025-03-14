@@ -5,6 +5,7 @@ import { Session } from '../models/session';
 import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
+import { MongoDocument } from '../models/appTypes';
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -17,10 +18,6 @@ const INITIAL_SESSIONS_FILE = 'initial-sessions.json';
 const DB_URI = process.env.DB_URI ?? 'mongodb://localhost:27017/biteswipe';
 console.log(`Database URI: ${DB_URI} [Source: ${process.env.DB_URI ? 'ENV' : 'DEFAULT'}]`);
 
-interface MongoDocument {
-    _id?: { $oid: string } | string;
-    [key: string]: any;
-}
 
 function transformMongoId(doc: MongoDocument): MongoDocument {
     const transformed = { ...doc };
