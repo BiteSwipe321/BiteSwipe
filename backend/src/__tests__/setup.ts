@@ -60,7 +60,16 @@ const mockUserService = {
 const mockSessionManager = {
   createSession: jest.fn(),
   getSession: jest.fn(),
-  sessionSwiped: jest.fn()
+  sessionSwiped: jest.fn(),
+  inviteUser: jest.fn(),
+  joinSession: jest.fn(),
+  getRestaurantsInSession: jest.fn(),
+  startSession: jest.fn(),
+  rejectInvitation: jest.fn(),
+  leaveSession: jest.fn(),
+  getResultForSession: jest.fn(),
+  userDoneSwiping: jest.fn(),
+  addPendingInvitation: jest.fn(),
 };
 
 // Create mock implementations

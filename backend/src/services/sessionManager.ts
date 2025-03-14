@@ -18,7 +18,7 @@ export class SessionManager {
     }
     
     async createSession(
-        userId: string,
+        userId: String,
         settings: {
             latitude: number;
             longitude: number;
@@ -49,9 +49,9 @@ export class SessionManager {
             const joinCode = await this.generateUniqueJoinCode();
 
             const session = new Session({
-                creator: userObjectId,
+                creator: userId,
                 participants: [{
-                    userId: userObjectId,
+                    userId: userId,
                     preferences: []
                 }],
                 pendingInvitations: [],
@@ -71,7 +71,7 @@ export class SessionManager {
                 expiresAt
             });
 
-            session.doneSwiping = [userObjectId];
+            session.doneSwiping = [Types.ObjectId.createFromHexString(userId)];
 
             await session.save();
             return session;

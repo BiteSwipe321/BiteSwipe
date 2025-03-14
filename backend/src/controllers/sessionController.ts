@@ -36,16 +36,19 @@ export class SessionController {
 
     async getSession(req: Request, res: Response) {
         try {
+            if(req.params.sessionId.length !== 24) {
+                return res.status(400).json({ error: 'Invalid session ID format' });
+            }
             const sessionId = req.params.sessionId;
             console.log('Session ID from params:', sessionId);
             
             const session = await this.sessionManager.getSession(sessionId);
-            res.json(session);
-        } catch (error) {
-            console.error('Error fetching session:', error);
-            if (error instanceof Error && (error as any).code === 'SESSION_NOT_FOUND') {
+            if(!session) {
                 return res.status(404).json({ error: 'Session not found' });
             }
+            res.status(200).json(session);
+        } catch (error) {
+            console.error('Error fetching session:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     }
@@ -63,9 +66,9 @@ export class SessionController {
             const lat = typeof latitude === 'string' ? parseFloat(latitude) : latitude;
             const lng = typeof longitude === 'string' ? parseFloat(longitude) : longitude;
             const rad = typeof radius === 'string' ? parseFloat(radius) : radius;
-
+            
             // Validate userId is a valid ObjectId
-            if (!Types.ObjectId.isValid(userId)) {
+            if (userId.length !== 24) {
                 return res.status(400).json({ error: 'Invalid user ID format' });
             }
 
@@ -135,7 +138,7 @@ export class SessionController {
                 String(userId)
             );
 
-            res.json(session);
+            res.status(200).json(session);
         } catch (error) {
             console.error('Error joining session:', error);
             if (error instanceof Error) {
@@ -153,7 +156,7 @@ export class SessionController {
 
             const session = await this.sessionManager.rejectInvitation(sessionId, userId);
 
-            res.json(session);
+            res.status(200).json(session);
         } catch (error) {
             console.error('Error rejecting invitation:', error);
             if (error instanceof Error) {
