@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { SessionManager } from '../services/sessionManager';
 import { UserService } from '../services/userService';
 
@@ -63,9 +62,9 @@ export class UserController {
             const { email, displayName } = req.body;
             const user = await this.userService.createUser(email, displayName);
             res.status(201).json(user);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating user:', error);
-            if (error?.message?.includes('already exists')) {
+            if (error instanceof Error && error.message.includes('already exists')) {
                 res.status(409).json({ error: 'User with this email already exists' });
             } else {
                 res.status(500).json({ error: 'Internal Server Error' });

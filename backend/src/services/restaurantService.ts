@@ -49,10 +49,12 @@ export class RestaurantService {
                         },
                         priceLevel: details.price_level ?? 0,
                         rating: details.rating ?? 0,
-                        openingHours: details.opening_hours ? {
-                            openNow: details.opening_hours.open_now,
-                            weekdayText: details.opening_hours.weekday_text
-                        } : undefined,
+                        openingHours: details.opening_hours
+                            ? {
+                                openNow: details.opening_hours.open_now,
+                                weekdayText: details.opening_hours.weekday_text
+                            }
+                            : undefined,
                         sourceData: {
                             googlePlaceId: place.place_id,
                             lastUpdated: new Date()

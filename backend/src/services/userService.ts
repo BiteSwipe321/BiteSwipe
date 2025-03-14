@@ -1,18 +1,6 @@
 import { UserModel } from '../models/user';
 import mongoose, { Types } from 'mongoose';
 
-interface Location {
-    latitude: number,
-    longitude: number,
-    radius: number
-}
-
-interface Restaurant {
-    id: String,
-    name: String,
-    location: Location,
-    rating: Number
-}
 
 export class UserService {
     async createUser(email: string, displayName: string) {  
@@ -42,7 +30,7 @@ export class UserService {
             if (!Types.ObjectId.isValid(userId)) {
                 throw new Error('Invalid user ID format');
             }
-            const userObjectId = Types.ObjectId.createFromHexString(userId) as mongoose.Types.ObjectId;
+            const userObjectId = Types.ObjectId.createFromHexString(userId) as unknown as Types.ObjectId;
             return await UserModel.findById(userObjectId)
                 .select('-__v') // Exclude version field
                 .lean(); // Convert to plain JavaScript object

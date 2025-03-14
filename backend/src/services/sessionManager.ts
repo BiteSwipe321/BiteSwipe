@@ -2,12 +2,14 @@ import mongoose, { Types } from 'mongoose';
 import { Session, ISession, SessionStatus } from '../models/session';
 import { RestaurantService } from './restaurantService';
 import { UserModel } from '../models/user';
+import crypto from 'crypto';
 
 interface CustomError extends Error {
     code?: string;
 }
 
 export class SessionManager {
+    private readonly joinCodeCharacters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
     private restaurantService: RestaurantService;
 
@@ -42,7 +44,7 @@ export class SessionManager {
             const expiresAt = new Date();
             expiresAt.setHours(expiresAt.getHours() + 24);
 
-            const restaurants = await this.restaurantService.addRestaurants(settings, '');
+            const restaurants = await this.restaurantService.addRestaurants(settings, '') as {_id: string}[];
 
             const joinCode = await this.generateUniqueJoinCode();
 
@@ -64,9 +66,9 @@ export class SessionManager {
                         positiveVotes: 0
                     };
                 }),
-                joinCode: joinCode,
+                joinCode,
                 status: 'CREATED' as SessionStatus,
-                expiresAt: expiresAt
+                expiresAt
             });
 
             session.doneSwiping = [userObjectId];
@@ -80,17 +82,17 @@ export class SessionManager {
     }
 
     private async generateUniqueJoinCode(): Promise<string> {
-        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let isUnique = false;
         let joinCode = '';
 
         while (!isUnique) {
             joinCode = '';
             for (let i = 0; i < 5; i++) {
-                joinCode += characters.charAt(Math.floor(Math.random() * characters.length));
+                const randomIndex = crypto.randomInt(0, this.joinCodeCharacters.length);
+                joinCode += this.joinCodeCharacters.charAt(randomIndex);
             }
 
-            const existingSession = await Session.findOne({ joinCode: joinCode, status: { $ne: 'COMPLETED'} });
+            const existingSession = await Session.findOne({ joinCode, status: { $ne: 'COMPLETED'} });
 
             isUnique = !existingSession;
         }
@@ -206,7 +208,7 @@ export class SessionManager {
 
         const updatedSession = await Session.findOneAndUpdate(
             {
-                joinCode: joinCode,
+                joinCode,
                 status: { $ne: 'COMPLETED' },
                 pendingInvitations: userObjectId,
                 'participants.userId': { $ne: userObjectId }
@@ -225,7 +227,7 @@ export class SessionManager {
     
         if (!updatedSession) {
             // Determine the specific reason for failure
-            const session = await Session.findOne({ joinCode: joinCode });
+            const session = await Session.findOne({ joinCode });
             
             if (!session) {
                 throw new Error('Session not found');

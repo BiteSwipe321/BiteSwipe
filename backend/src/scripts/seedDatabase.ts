@@ -14,7 +14,7 @@ const DATA_DIR = path.join(__dirname, '../../data');
 const INITIAL_RESTAURANTS_FILE = 'initial-restaurants.json';
 const INITIAL_USERS_FILE = 'initial-users.json';
 const INITIAL_SESSIONS_FILE = 'initial-sessions.json';
-const DB_URI = process.env.DB_URI || 'mongodb://localhost:27017/biteswipe';
+const DB_URI = process.env.DB_URI ?? 'mongodb://localhost:27017/biteswipe';
 console.log(`Database URI: ${DB_URI} [Source: ${process.env.DB_URI ? 'ENV' : 'DEFAULT'}]`);
 
 interface MongoDocument {
@@ -111,26 +111,26 @@ async function seedDatabase() {
         // Transform and insert restaurants
         const transformedRestaurants = (Array.isArray(restaurantsJson) ? restaurantsJson : [restaurantsJson])
             .map(transformMongoId)
-            .map((restaurant: any) => ({
+            .map((restaurant: MongoDocument) => ({
                 ...(restaurant._id && { _id: restaurant._id }),
-                name: restaurant.name,
-                address: restaurant.location?.address ?? '',
+                name: (restaurant as unknown).name,
+                address: (restaurant as unknown).location?.address ?? '',
                 location: {
                     type: 'Point',
                     coordinates: [
-                        restaurant.location?.coordinates?.longitude ?? 0,
-                        restaurant.location?.coordinates?.latitude ?? 0
+                        (restaurant as unknown).location?.coordinates?.longitude ?? 0,
+                        (restaurant as unknown).location?.coordinates?.latitude ?? 0
                     ]
                 },
-                phoneNumber: restaurant.contact?.phone ?? '',
-                website: restaurant.contact?.website ?? '',
-                primaryImage: restaurant.images?.primary ?? '',
-                galleryImages: restaurant.images?.gallery ?? [],
-                cuisine: restaurant.cuisine ?? '',
-                priceRange: restaurant.priceRange ?? '',
-                rating: restaurant.rating ?? 0,
-                openingHours: restaurant.openingHours ?? '',
-                googlePlaceId: restaurant.sourceData?.googlePlaceId ?? ''
+                phoneNumber: (restaurant as unknown).contact?.phone ?? '',
+                website: (restaurant as unknown).contact?.website ?? '',
+                primaryImage: (restaurant as unknown).images?.primary ?? '',
+                galleryImages: (restaurant as unknown).images?.gallery ?? [],
+                cuisine: (restaurant as unknown).cuisine ?? '',
+                priceRange: (restaurant as unknown).priceRange ?? '',
+                rating: (restaurant as unknown).rating ?? 0,
+                openingHours: (restaurant as unknown).openingHours ?? '',
+                googlePlaceId: (restaurant as unknown).sourceData?.googlePlaceId ?? ''
             }));
 
         const insertedRestaurants = await Restaurant.insertMany(transformedRestaurants);

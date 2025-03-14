@@ -65,7 +65,7 @@ export class GooglePlacesService {
             const response = await axios.get(`${this.baseUrl}/nearbysearch/json`,{
                 params: {
                     location: `${latitude},${longitude}`,
-                    radius: radius,
+                    radius,
                     type: 'restaurant',
                     keyword: keyword ?? 'food',
                     key: this.apiKey
