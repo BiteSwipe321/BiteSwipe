@@ -33,7 +33,7 @@ export async function createApp(): Promise<Express> {
   // Register routes
   const routes = [
     ...userRoutes(userService, sessionManager),
-    ...sessionRoutes(sessionManager)
+    ...sessionRoutes(sessionManager, userService)
   ];
 
   // Register routes with validation
