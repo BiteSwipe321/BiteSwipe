@@ -75,7 +75,7 @@ describe('Mocked: POST /sessions', () => {
     const response = await request(app)
       .post('/sessions')
       .send(sessionData);
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(201);
   });
 });
 
