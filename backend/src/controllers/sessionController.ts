@@ -107,9 +107,9 @@ export class SessionController {
             }
 
             res.json(session);
-        } catch (error) {
-            console.error('Error inviting user:', error);
+        } catch (error: unknown) {
             if (error instanceof Error) {
+                console.error('Error inviting user:', error);
                 if (error.message.includes('already')) {
                     return res.status(400).json({ error: error.message });
                 }
@@ -125,7 +125,7 @@ export class SessionController {
 
             const session = await this.sessionManager.joinSession(
                 joinCode,
-                userId
+                String(userId)
             );
 
             res.json(session);
@@ -204,7 +204,7 @@ export class SessionController {
             const { sessionId } = req.params;
             const { userId, restaurantId, liked} = req.body;
 
-            const session = await this.sessionManager.sessionSwiped(sessionId, userId, restaurantId, liked);
+            const session = await this.sessionManager.sessionSwiped(sessionId, String(userId), String(restaurantId), Boolean(liked));
 
             res.json({ success: true, session: session._id });
         } catch (error) {
@@ -219,7 +219,7 @@ export class SessionController {
             const { sessionId } = req.params;
             const { userId, time } = req.body;
 
-            const session = await this.sessionManager.startSession(sessionId, userId, Number(time));
+            const session = await this.sessionManager.startSession(sessionId, String(userId), Number(time));
 
             res.json({ success: true, session: session._id });
         } catch (error) {
@@ -234,7 +234,7 @@ export class SessionController {
             const { sessionId } = req.params;
             const { userId } = req.body;
 
-            const session = await this.sessionManager.userDoneSwiping(sessionId, userId);
+            const session = await this.sessionManager.userDoneSwiping(sessionId, String(userId));
 
             res.json({ success: true, session: session._id });
         } catch (error) {
