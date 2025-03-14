@@ -3,14 +3,18 @@ import { Types } from 'mongoose';
 import { SessionManager } from '../services/sessionManager';
 import { NotificationService } from '../services/notificationService';
 import { UserModel } from '../models/user';
+import { MongoDocument } from '../models/appTypes';
+import { UserService } from '../services/userService';
 
 export class SessionController {
     private sessionManager: SessionManager;
     private notificationService: NotificationService;
+    private userService: UserService;
 
-    constructor(sessionManager: SessionManager) {
+    constructor(sessionManager: SessionManager, userService: UserService) {
         this.sessionManager = sessionManager;
         this.notificationService = new NotificationService();
+        this.userService = userService;
 
         // Bind methods
         this.getSession = this.getSession.bind(this);
@@ -85,20 +89,23 @@ export class SessionController {
         try {
             const sessionId = req.params.sessionId;
             const { email } = req.body;
-
-            const user = await UserModel.findOne({ email });
+            const user = await this.userService.getUserByEmail(String(email)) as unknown as MongoDocument;
             
             if (!user) {
                 return res.status(404).json({ error: 'No user found with this email'});
             }
             
+            if (!user._id) {
+                return res.status(400).json({ error: 'User has no ID' });
+            }
+
             const session = await this.sessionManager.addPendingInvitation(
                 sessionId,
                 user._id.toString()
             );
 
             // Send notification to invited user
-            if (user?.fcmToken) {
+            if (user.fcmToken && typeof user.fcmToken === 'string') {
                 await this.notificationService.sendNotification(
                     user.fcmToken,
                     'Session Invitation',
