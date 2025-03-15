@@ -5,6 +5,11 @@ on:
     branches:
       - main
 
+# Define permissions needed for GitHub API operations
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test-and-coverage:
     runs-on: ubuntu-latest
