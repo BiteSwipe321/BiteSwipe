@@ -27,7 +27,7 @@ jobs:
       # Run tests and generate coverage
       - name: Run tests with coverage
         run: |
-          cd backend && npm run test:coverage
+          cd backend && npm run test:coverage -- --coverageReporters="json-summary" --no-cache
         env:
           CI: true
 
@@ -36,14 +36,7 @@ jobs:
         id: coverage
         working-directory: ./backend
         run: |
-          node -e "
-          const fs = require('fs');
-          const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
-          const table = Object.entries(summary.total).map(([key, value]) => {
-            return \`| \${key} | \${value.pct}% | \${value.covered}/\${value.total} |\`;
-          }).join('\n');
-          console.log('::set-output name=table::' + table);
-          "
+          echo "table=$(node -e "const fs = require('fs'); const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8')); const table = Object.entries(summary.total).map(([key, value]) => { return '| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |'; }).join('\n'); console.log(table);" )" >> $GITHUB_OUTPUT
 
       # Update PR description with coverage table
       - name: Update PR description with coverage
@@ -51,7 +44,7 @@ jobs:
         with:
           script: |
             const { context, github } = require('@actions/github');
-            const table = `| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${process.env.TABLE}`;
+            const table = `| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${{ steps.coverage.outputs.table }}`;
             const pr = context.payload.pull_request;
             if (pr) {
               const body = pr.body || '';
@@ -62,8 +55,6 @@ jobs:
                 body: updatedBody
               });
             }
-        env:
-          TABLE: ${{ steps.coverage.outputs.table }}
 
       # Comment on PR if tests fail
       - name: Comment on PR if tests fail
