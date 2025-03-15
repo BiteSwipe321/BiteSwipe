@@ -36,25 +36,42 @@ jobs:
         env:
           CI: true
 
-      # Extract coverage summary
-      - name: Extract coverage summary
-        id: coverage
+      # Generate coverage table and save to file
+      - name: Generate coverage table
+        id: coverage_table
         working-directory: ./backend
         run: |
-          # Create a multiline string with delimiters
-          echo 'table<<EOF' >> $GITHUB_OUTPUT
-          node -e "const fs = require('fs'); const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8')); const table = Object.entries(summary.total).map(([key, value]) => { return '| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |'; }).join('\n'); console.log(table);" >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+          # Create a formatted coverage table and save to a file
+          node -e "
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+            
+            // Create table header
+            let table = '| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n';
+            
+            // Add rows for each metric
+            for (const [key, value] of Object.entries(summary.total)) {
+              table += '| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |\n';
+            }
+            
+            // Write to file
+            fs.writeFileSync('coverage_table.txt', table);
+            
+            // Also output the path for GitHub Actions
+            console.log('::set-output name=table_path::coverage_table.txt');
+          "
 
       # Update PR description with coverage table
       - name: Update PR description with coverage
         uses: actions/github-script@v6
         with:
           script: |
-            // Split the multiline string handling to avoid syntax errors
-            const tableHeader = "| Metric | Coverage | Covered/Total |\\n|--------|----------|---------------|\\n";
-            const coverageData = process.env.COVERAGE_DATA;
-            const table = tableHeader + coverageData;
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Read the coverage table from file
+            const tablePath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'coverage_table.txt');
+            const table = fs.readFileSync(tablePath, 'utf8');
             
             const pr = context.payload.pull_request;
             if (pr) {
@@ -82,8 +99,6 @@ jobs:
                 body: updatedBody
               });
             }
-        env:
-          COVERAGE_DATA: ${{ steps.coverage.outputs.table }}
 
       # Comment on PR if tests fail
       - name: Comment on PR if tests fail
