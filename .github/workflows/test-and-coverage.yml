@@ -1,0 +1,86 @@
+name: Run Tests and Update PR with Coverage
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-and-coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: cd backend && npm install
+
+      # Run tests and generate coverage
+      - name: Run tests with coverage
+        run: |
+          cd backend && npm run test:coverage
+        env:
+          CI: true
+
+      # Extract coverage summary
+      - name: Extract coverage summary
+        id: coverage
+        run: |
+          cd backend && node -e "
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+          const table = Object.entries(summary.total).map(([key, value]) => {
+            return \`| \${key} | \${value.pct}% | \${value.covered}/\${value.total} |\`;
+          }).join('\n');
+          console.log('::set-output name=table::' + table);
+          "
+
+      # Update PR description with coverage table
+      - name: Update PR description with coverage
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { context, github } = require('@actions/github');
+            const table = `| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${process.env.TABLE}`;
+            const pr = context.payload.pull_request;
+            if (pr) {
+              const body = pr.body || '';
+              const updatedBody = `${body}\n\n### Test Coverage\n${table}`;
+              await github.rest.pulls.update({
+                ...context.repo,
+                pull_number: pr.number,
+                body: updatedBody
+              });
+            }
+        env:
+          TABLE: ${{ steps.coverage.outputs.table }}
+
+      # Comment on PR if tests fail
+      - name: Comment on PR if tests fail
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { context, github } = require('@actions/github');
+            const pr = context.payload.pull_request;
+            if (pr) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: pr.number,
+                body: '❌ Tests failed! Please fix the failing tests before merging this PR.'
+              });
+            }
+
+      # Fail if tests fail
+      - name: Fail if tests fail
+        if: failure()
+        run: exit 1
