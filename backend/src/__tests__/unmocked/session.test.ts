@@ -1,5 +1,3 @@
-import { Express } from 'express';
-import request from 'supertest';
 import mongoose from 'mongoose';
 import { SessionManager } from '../../services/sessionManager';
 import { RestaurantService } from '../../services/restaurantService';
@@ -75,8 +73,8 @@ jest.mock('../../models/session', () => {
         return Promise.resolve({
           _id: 'sessionWithInvites',
           status: 'CREATED',
-          participants: [{ userId: { equals: (id) => id === 'userId1' } }],
-          pendingInvitations: [{ equals: (id) => id === 'invitedUserId' }]
+          participants: [{ userId: { equals: (id: any) => id === 'userId1' } }],
+          pendingInvitations: [{ equals: (id: any) => id === 'invitedUserId' }]
         });
       }
       
@@ -104,29 +102,29 @@ jest.mock('../../models/session', () => {
       if (id.toString() === 'completedSessionId') {
         return Promise.resolve({
           _id: id,
-          status: 'COMPLETED',
-          creator: { equals: (userId) => userId === 'creatorId' },
+          status: 'COMPLETED' as const,
+          creator: { equals: (userId: string): boolean => userId === 'creatorId' },
           participants: [
-            { userId: { equals: (userId) => userId === 'userId1' || userId === 'creatorId' } }
+            { userId: { equals: (userId: string): boolean => userId === 'userId1' || userId === 'creatorId' } }
           ],
           restaurants: [{ restaurantId: 'restaurant1', positiveVotes: 0, totalVotes: 0, score: 0 }],
-          doneSwiping: [],
-          save: jest.fn().mockResolvedValue({})
+          doneSwiping: [] as string[],
+          save: jest.fn().mockResolvedValue({}) as jest.Mock<Promise<{}>>
         });
       }
       
       return Promise.resolve({
         _id: id,
         status: 'MATCHING',
-        creator: { equals: (userId) => userId === 'creatorId' },
+        creator: { equals: (userId: any) => userId === 'creatorId' },
         participants: [
           { 
-            userId: { equals: (userId) => userId === 'userId1' || userId === 'creatorId' },
+            userId: { equals: (userId: any) => userId === 'userId1' || userId === 'creatorId' },
             preferences: []
           }
         ],
         restaurants: [{ restaurantId: { toString: () => 'restaurant1' }, positiveVotes: 0, totalVotes: 0, score: 0 }],
-        doneSwiping: [{ equals: (userId) => userId === 'userId1' }],
+        doneSwiping: [{ equals: (userId: any) => userId === 'userId1' }],
         save: jest.fn().mockResolvedValue({})
       });
     }),
@@ -264,6 +262,65 @@ describe('SessionManager', () => {
   });
 
   describe('Session Swiped Test', () => {
+    // test('should successfully record a user swipe on a restaurant', async () => {
+    //   // Setup
+    //   const sessionId = 'valid-session-id';
+    //   const userId = 'userId1';
+    //   const restaurantId = 'new-restaurant-id';
+    //   const swipe = true;
+      
+    //   // Mock the findOneAndUpdate to return a successful result
+    //   const mockSession = {
+    //     _id: sessionId,
+    //     status: 'MATCHING',
+    //     participants: [
+    //       {
+    //         userId: userId,
+    //         preferences: [
+    //           {
+    //             restaurantId: restaurantId,
+    //             liked: swipe,
+    //             timestamp: expect.any(Date)
+    //           }
+    //         ]
+    //       }
+    //     ]
+    //   };
+      
+    //   jest.spyOn(require('../../models/session').Session, 'findOneAndUpdate')
+    //     .mockResolvedValueOnce(mockSession);
+      
+    //   // Execute
+    //   const result = await sessionManager.sessionSwiped(sessionId, userId, restaurantId, swipe);
+      
+    //   // Assert
+    //   expect(result).toEqual(mockSession);
+    //   expect(require('../../models/session').Session.findOneAndUpdate).toHaveBeenCalledWith(
+    //     {
+    //       _id: expect.anything(),
+    //       status: { $eq: 'MATCHING' },
+    //       'participants.userId': expect.anything(),
+    //       'participants': {
+    //         $not: {
+    //           $elemMatch: {
+    //             userId: expect.anything(),
+    //             'preferences.restaurantId': restaurantId
+    //           }
+    //         }
+    //       }
+    //     },
+    //     {
+    //       $push: {
+    //         'participants.$.preferences': {
+    //           restaurantId: restaurantId,
+    //           liked: swipe,
+    //           timestamp: expect.any(Date)
+    //         }
+    //       }
+    //     },
+    //     { new: true, runValidators: true }
+    //   );
+    // });
     test('should successfully record a user swipe on a restaurant', async () => {
       // Setup
       const sessionId = 'valid-session-id';
@@ -299,14 +356,14 @@ describe('SessionManager', () => {
       expect(result).toEqual(mockSession);
       expect(require('../../models/session').Session.findOneAndUpdate).toHaveBeenCalledWith(
         {
-          _id: expect.anything(),
+          _id: { str: "valid-session-id" },
           status: { $eq: 'MATCHING' },
-          'participants.userId': expect.anything(),
+          'participants.userId': { str: "userId1" },
           'participants': {
             $not: {
               $elemMatch: {
-                userId: expect.anything(),
-                'preferences.restaurantId': restaurantId
+                userId: { str: "userId1" },
+                'preferences.restaurantId': { str: "new-restaurant-id" }
               }
             }
           }
@@ -314,7 +371,7 @@ describe('SessionManager', () => {
         {
           $push: {
             'participants.$.preferences': {
-              restaurantId: restaurantId,
+              restaurantId: { str: "new-restaurant-id" },
               liked: swipe,
               timestamp: expect.any(Date)
             }
@@ -405,7 +462,6 @@ describe('SessionManager', () => {
         .rejects.toThrow('Session does not exist or already completed or user not in session');
     });
 
-  
     test('should handle negative swipe (dislike) properly', async () => {
       // Setup
       const sessionId = 'valid-session-id';
@@ -440,19 +496,79 @@ describe('SessionManager', () => {
       // Assert
       expect(result).toEqual(mockSession);
       expect(require('../../models/session').Session.findOneAndUpdate).toHaveBeenCalledWith(
-        expect.anything(),
+        {
+          _id: { str: "valid-session-id" },
+          status: { $eq: 'MATCHING' },
+          'participants.userId': { str: "userId1" },
+          'participants': {
+            $not: {
+              $elemMatch: {
+                userId: { str: "userId1" },
+                'preferences.restaurantId': { str: "new-restaurant-id" }
+              }
+            }
+          }
+        },
         {
           $push: {
             'participants.$.preferences': {
-              restaurantId: restaurantId,
+              restaurantId: { str: "new-restaurant-id" },
               liked: false,
               timestamp: expect.any(Date)
             }
           }
         },
-        expect.anything()
+        { new: true, runValidators: true }
       );
     });
+  
+    // test('should handle negative swipe (dislike) properly', async () => {
+    //   // Setup
+    //   const sessionId = 'valid-session-id';
+    //   const userId = 'userId1';
+    //   const restaurantId = 'new-restaurant-id';
+    //   const swipe = false; // Dislike
+      
+    //   // Mock the findOneAndUpdate to return a successful result with dislike
+    //   const mockSession = {
+    //     _id: sessionId,
+    //     status: 'MATCHING',
+    //     participants: [
+    //       {
+    //         userId: userId,
+    //         preferences: [
+    //           {
+    //             restaurantId: restaurantId,
+    //             liked: false,
+    //             timestamp: expect.any(Date)
+    //           }
+    //         ]
+    //       }
+    //     ]
+    //   };
+      
+    //   jest.spyOn(require('../../models/session').Session, 'findOneAndUpdate')
+    //     .mockResolvedValueOnce(mockSession);
+      
+    //   // Execute
+    //   const result = await sessionManager.sessionSwiped(sessionId, userId, restaurantId, swipe);
+      
+    //   // Assert
+    //   expect(result).toEqual(mockSession);
+    //   expect(require('../../models/session').Session.findOneAndUpdate).toHaveBeenCalledWith(
+    //     expect.anything(),
+    //     {
+    //       $push: {
+    //         'participants.$.preferences': {
+    //           restaurantId: restaurantId,
+    //           liked: false,
+    //           timestamp: expect.any(Date)
+    //         }
+    //       }
+    //     },
+    //     expect.anything()
+    //   );
+    // });
   });
 
   describe('addPendingInvitation', () => {
@@ -522,7 +638,7 @@ describe('SessionManager', () => {
       require('../../models/session').Session.findById.mockResolvedValueOnce({
         _id: sessionId,
         status: 'CREATED',
-        participants: [{ userId: { equals: (id) => id === userId } }],
+        participants: [{ userId: { equals: (id: any) => id === userId } }],
         pendingInvitations: []
       });
       
@@ -544,7 +660,7 @@ describe('SessionManager', () => {
         _id: sessionId,
         status: 'CREATED',
         participants: [],
-        pendingInvitations: [{ equals: (id) => id === userId }]
+        pendingInvitations: [{ equals: (id: any) => id === userId }]
       });
       
       // Act & Assert
@@ -569,42 +685,6 @@ describe('SessionManager', () => {
       mongoose.Types.ObjectId.isValid = originalIsValid;
     });
   });
-
-  // describe('Get Restaurant Result', () => {
-  //   //TODO
-  // });
-
-  // describe('Join Session', () => {
-  //   //TODO
-  // });
-
-  // describe('Start Session', () => {
-  //   //TODO
-  // });
-
-  // describe('User Done Swiping', () => {
-  //   //TODO
-  // });
-    
-  // describe('Get Restaurant In Session', () => {
-  //   //TODO
-  // });
-
-  // describe('Leave Session', () => {
-  //   //TODO
-  // });
-
-  // describe('Reject Invitation', () => {
-  //   //TODO
-  // });
-
-  // describe('Get Sessions', () => {
-  //   //TODO
-  // });
-
-  // describe('Get User Session', () => {
-  //   //TODO
-  // });
 
   // ...existing code...
 
@@ -715,7 +795,7 @@ describe('SessionManager', () => {
         joinCode,
         status: 'CREATED',
         participants: [{ userId: 'creatorId' }],
-        pendingInvitations: [{ equals: (id) => id === userId }]
+        pendingInvitations: [{ equals: (id: any) => id === userId }]
       };
       
       jest.spyOn(require('../../models/session').Session, 'findOneAndUpdate')
@@ -797,7 +877,7 @@ describe('SessionManager', () => {
       jest.spyOn(require('../../models/session').Session, 'findOne')
         .mockResolvedValueOnce({
           status: 'CREATED',
-          participants: [{ userId: { equals: (id) => id === userId } }]
+          participants: [{ userId: { equals: (id: any) => id === userId } }]
         });
       
       // Execute & Assert
@@ -1082,7 +1162,7 @@ describe('SessionManager', () => {
       jest.spyOn(require('../../models/session').Session, 'findById')
         .mockResolvedValueOnce({ 
           status: 'MATCHING',
-          creator: { equals: (id) => id === creatorId }
+          creator: { equals: (id: any) => id === creatorId }
         });
       
       // Execute & Assert
@@ -1187,7 +1267,7 @@ describe('SessionManager', () => {
       jest.spyOn(require('../../models/session').Session, 'findById')
         .mockResolvedValueOnce({
         status: 'MATCHING',
-        participants: [{ userId: { equals: (id) => id === userId } }]
+        participants: [{ userId: { equals: (id: any) => id === userId } }]
       });
       
       // Execute & Assert

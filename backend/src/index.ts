@@ -1,6 +1,15 @@
 import 'dotenv/config';
 import mongoose, { Mongoose } from 'mongoose';
 import { createApp } from './app';
+import express from 'express';
+import morgan from 'morgan';
+import path from 'path';
+import { RestaurantService } from './services/restaurantService';
+import { UserService } from './services/userService';
+import { SessionManager } from './services/sessionManager';
+import { userRoutes } from './routes/userRoutes';
+import { sessionRoutes } from './routes/sessionRoutes';
+import { validateRequest } from './middleware/validateRequest';
 
 // Configure mongoose
 mongoose.set('strictQuery', true);
@@ -24,14 +33,14 @@ const buildTimestamp = new Date().toISOString();
 // Register routes
 const routes = [
     ...userRoutes(userService, sessionManager),
-    ...sessionRoutes(sessionManager)
+    ...sessionRoutes(sessionManager, userService)
 ];
 
 // Register routes with validation
 routes.forEach(route => {
     const { method, route: path, action, validation } = route;
     console.log(`Registering route: ${method.toUpperCase()} ${path}`);
-    app[method](path, validation, validateRequest, action);
+    app[method as keyof typeof app](path, validation, validateRequest, action);
 });
 
 // Add default route
@@ -78,7 +87,7 @@ typedMongoose.connect(dbUrl, {
     socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
     family: 4 // Use IPv4, skip trying IPv6
 })
-    .then(() => {
+    .then(async() => {
         console.log('\n=== MongoDB Connection Info ===');
         console.log('Connection Status: Connected');
         console.log(`Full URL: \x1b[34m${dbUrl}\x1b[0m`);

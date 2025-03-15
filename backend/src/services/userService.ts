@@ -30,7 +30,7 @@ export class UserService {
             if (!Types.ObjectId.isValid(userId)) {
                 throw new Error('Invalid user ID format');
             }
-            const userObjectId = Types.ObjectId.createFromHexString(userId) as unknown as Types.ObjectId;
+            const userObjectId = new Types.ObjectId(userId);
             return await UserModel.findById(userObjectId)
                 .select('-__v') // Exclude version field
                 .lean(); // Convert to plain JavaScript object
@@ -54,8 +54,7 @@ export class UserService {
             if (!Types.ObjectId.isValid(userId)) {
                 throw new Error('Invalid user ID format');
             }
-
-            const userObjectId = Types.ObjectId.createFromHexString(userId) as mongoose.Types.ObjectId;
+            const userObjectId = new Types.ObjectId(userId);
             const result = await UserModel.findByIdAndUpdate(userObjectId, { fcmToken }, { new: true })
                 .select('-__v')
                 .lean();
