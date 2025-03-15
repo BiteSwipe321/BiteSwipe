@@ -31,6 +31,7 @@ jobs:
 
       # Run tests and generate coverage
       - name: Run tests with coverage
+        id: test_coverage
         run: |
           cd backend && npm run test:coverage -- --coverageReporters="json-summary" "text" --no-cache
         env:
@@ -63,95 +64,18 @@ jobs:
             console.log('------------------------\\n');
           "
 
-      # Display detailed coverage report in logs and capture it for PR comment
-      - name: Display detailed coverage report
-        id: detailed_coverage
-        working-directory: ./backend
-        run: |
-          echo "::group::Detailed Coverage Report"
-          npx jest --coverage --coverageReporters="text" --no-cache | tee coverage_output.txt
-          echo "::endgroup::"
-          
-          # Extract files with low coverage and their line numbers
-          node -e "
-            const fs = require('fs');
-            const coverageOutput = fs.readFileSync('coverage_output.txt', 'utf8');
-            
-            // Extract the table with file coverage information
-            const tableLines = coverageOutput.split('\n').filter(line => 
-              line.includes('|') && 
-              (line.includes('%') || line.includes('File') || line.includes('All files') || line.includes('---'))
-            );
-            
-            // Find files with less than 80% coverage
-            const lowCoverageFiles = [];
-            for (const line of tableLines) {
-              // Skip header and separator lines
-              if (line.includes('File') || line.includes('---') || line.includes('All files')) continue;
-              
-              const parts = line.split('|');
-              if (parts.length >= 5) {
-                const file = parts[0].trim();
-                const linesCoverage = parseFloat(parts[4].trim());
-                const uncoveredLines = parts[5] ? parts[5].trim() : '';
-                
-                if (linesCoverage < 80) {
-                  lowCoverageFiles.push({ file, linesCoverage, uncoveredLines });
-                }
-              }
-            }
-            
-            // Save the low coverage files to output
-            fs.writeFileSync('low_coverage_files.json', JSON.stringify(lowCoverageFiles));
-            
-            // Save the workflow run ID
-            const envFile = process.env.GITHUB_OUTPUT;
-            fs.appendFileSync(envFile, 'workflow_run_id=' + process.env.GITHUB_RUN_ID + '\n');
-            fs.appendFileSync(envFile, 'has_low_coverage=' + (lowCoverageFiles.length > 0 ? 'true' : 'false') + '\n');
-          "
-      
-      # Add a comment with a link to the coverage report and low coverage files
-      - name: Add coverage report link to PR
-        if: github.event_name == 'pull_request'
+      # Comment on PR if tests pass
+      - name: Comment on PR if tests pass
+        if: success()
         uses: actions/github-script@v6
-        env:
-          WORKFLOW_RUN_ID: ${{ steps.detailed_coverage.outputs.workflow_run_id }}
-          HAS_LOW_COVERAGE: ${{ steps.detailed_coverage.outputs.has_low_coverage }}
         with:
           script: |
-            const fs = require('fs');
-            const path = require('path');
-            
             const pr = context.payload.pull_request;
             if (pr) {
-              const workflowRunId = process.env.WORKFLOW_RUN_ID || context.runId;
-              const runId = workflowRunId;
-              const hasLowCoverage = process.env.HAS_LOW_COVERAGE === 'true';
-              
-              // Create the URL to the workflow run
+              const runId = context.runId;
               const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
               
-              let comment = "## Test Coverage Report\n\n📊 [View detailed coverage report in workflow logs](" + workflowUrl + ")";
-              
-              // Add low coverage files if there are any
-              if (hasLowCoverage) {
-                try {
-                  const lowCoverageFilesPath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'low_coverage_files.json');
-                  const lowCoverageFiles = JSON.parse(fs.readFileSync(lowCoverageFilesPath, 'utf8'));
-                  
-                  if (lowCoverageFiles.length > 0) {
-                    comment += "\n\n### Files with Low Coverage (< 80%)\n";
-                    comment += "\n| File | Coverage % | Uncovered Lines |";
-                    comment += "\n|------|------------|----------------|";
-                    
-                    for (const file of lowCoverageFiles) {
-                      comment += `\n| ${file.file} | ${file.linesCoverage}% | ${file.uncoveredLines} |`;
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error reading low coverage files:', error);
-                }
-              }
+              const comment = "✅ **Tests passed!** [View coverage report in workflow logs](" + workflowUrl + ")";
               
               await github.rest.issues.createComment({
                 ...context.repo,
@@ -159,7 +83,27 @@ jobs:
                 body: comment
               });
             }
-      
+
+      # Comment on PR if tests fail
+      - name: Comment on PR if tests fail
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr) {
+              const runId = context.runId;
+              const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+              
+              const comment = "❌ **Tests failed!** [View error details in workflow logs](" + workflowUrl + ")";
+              
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: pr.number,
+                body: comment
+              });
+            }
+
       # Fail if tests fail
       - name: Fail if tests fail
         if: failure()
