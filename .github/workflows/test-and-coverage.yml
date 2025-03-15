@@ -32,16 +32,16 @@ jobs:
       # Run tests and generate coverage
       - name: Run tests with coverage
         run: |
-          cd backend && npm run test:coverage -- --coverageReporters="json-summary" "text" "text-summary" --no-cache
+          cd backend && npm run test:coverage -- --coverageReporters="json-summary" "text" --no-cache
         env:
           CI: true
 
-      # Generate coverage table and save to file
-      - name: Generate coverage table
-        id: coverage_table
+      # Generate summary coverage table
+      - name: Generate summary coverage table
+        id: summary_coverage
         working-directory: ./backend
         run: |
-          # Create a formatted coverage table and save to a file
+          # Create a formatted coverage table for summary metrics
           node -e "
             const fs = require('fs');
             const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
@@ -58,70 +58,49 @@ jobs:
               }
             }
             
-            // Create detailed table with file-level coverage
-            let detailedTable = '\\n\\n### Detailed Coverage Report\\n\\n```\\n';
-            
-            // Capture the text output from the coverage report
-            try {
-              // Try to read the text-summary.txt file first
-              const textReport = fs.readFileSync('./coverage/text-summary.txt', 'utf8');
-              detailedTable += textReport;
-            } catch (e) {
-              // If that fails, try to read the text report
-              try {
-                const textReport = fs.readFileSync('./coverage/text.txt', 'utf8');
-                detailedTable += textReport;
-              } catch (err) {
-              // If text report doesn't exist, create our own detailed table
-              detailedTable += '---------------------------|---------|----------|---------|---------|----------------------\\n';
-              detailedTable += 'File                       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s    \\n';
-              detailedTable += '---------------------------|---------|----------|---------|---------|----------------------\\n';
-              
-              // Add All files row
-              const total = summary.total;
-              detailedTable += 'All files                  | ' + 
-                total.statements.pct.toFixed(2).padStart(6) + ' | ' + 
-                total.branches.pct.toFixed(2).padStart(8) + ' | ' + 
-                total.functions.pct.toFixed(2).padStart(7) + ' | ' + 
-                total.lines.pct.toFixed(2).padStart(7) + ' | ' + 
-                '                      \\n';
-              
-              // Add rows for each file
-              for (const [filePath, coverage] of Object.entries(summary)) {
-                if (filePath === 'total') continue;
-                
-                detailedTable += filePath.padEnd(28) + '| ' + 
-                  coverage.statements.pct.toFixed(2).padStart(6) + ' | ' + 
-                  coverage.branches.pct.toFixed(2).padStart(8) + ' | ' + 
-                  coverage.functions.pct.toFixed(2).padStart(7) + ' | ' + 
-                  coverage.lines.pct.toFixed(2).padStart(7) + ' | ' + 
-                  '                      \\n';
-              }
-              
-              detailedTable += '---------------------------|---------|----------|---------|---------|----------------------\\n';
-            }
-            
-            detailedTable += '```';
-            
-            // Combine tables
-            const fullTable = summaryTable + detailedTable;
-            
             // Write to file
-            fs.writeFileSync('coverage_table.txt', fullTable);
-            
-            // Print the table to the GitHub Actions log
-            console.log('\n\n--- Coverage Summary ---');
-            console.log(summaryTable.replace(/\\n/g, '\n'));
-            console.log('\n\n--- Detailed Coverage Report ---');
-            console.log(detailedTable.replace(/\\n/g, '\n'));
-            console.log('------------------------\n');
+            fs.writeFileSync('summary_table.txt', summaryTable);
             
             // Use the new GitHub Actions environment file approach
             const envFile = process.env.GITHUB_OUTPUT;
-            fs.appendFileSync(envFile, 'table_path=coverage_table.txt\\n');
+            fs.appendFileSync(envFile, 'summary_table_path=summary_table.txt\\n');
+            
+            // Print the table to the GitHub Actions log
+            console.log('\\n\\n--- Coverage Summary ---');
+            console.log(summaryTable.replace(/\\\\n/g, '\\n'));
+            console.log('------------------------\\n');
           "
 
-      # Update PR description with coverage table
+      # Capture the text coverage report
+      - name: Capture detailed coverage report
+        id: detailed_coverage
+        working-directory: ./backend
+        run: |
+          # Run Jest with text reporter to capture the detailed report
+          npx jest --coverage --coverageReporters="text" --no-cache > coverage_detailed.txt
+          
+          # Format the detailed report for GitHub markdown
+          node -e "
+            const fs = require('fs');
+            let textReport = fs.readFileSync('coverage_detailed.txt', 'utf8');
+            
+            // Create a markdown code block with the text report
+            const detailedReport = '\\n\\n### Detailed Coverage Report\\n\\n```\\n' + textReport + '\\n```';
+            
+            // Write to file
+            fs.writeFileSync('detailed_report.txt', detailedReport);
+            
+            // Use the new GitHub Actions environment file approach
+            const envFile = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(envFile, 'detailed_report_path=detailed_report.txt\\n');
+            
+            // Print the report to the GitHub Actions log
+            console.log('\\n\\n--- Detailed Coverage Report ---');
+            console.log(textReport);
+            console.log('------------------------\\n');
+          "
+
+      # Update PR description with coverage tables
       - name: Update PR description with coverage
         uses: actions/github-script@v6
         with:
@@ -129,12 +108,16 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             
-            // Read the coverage table from file
-            const tablePath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'coverage_table.txt');
-            let table = fs.readFileSync(tablePath, 'utf8');
+            // Read the summary table from file
+            const summaryPath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'summary_table.txt');
+            const summaryTable = fs.readFileSync(summaryPath, 'utf8');
             
-            // Debug - log the content to make sure it's complete
-            console.log('\n\nCoverage table content to be added to PR:\n', table);
+            // Read the detailed report from file
+            const detailedPath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'detailed_report.txt');
+            const detailedReport = fs.readFileSync(detailedPath, 'utf8');
+            
+            // Combine them
+            const fullCoverageReport = `### Test Coverage\n${summaryTable}${detailedReport}`;
             
             const pr = context.payload.pull_request;
             if (pr) {
@@ -154,21 +137,13 @@ jobs:
               }
               
               // Add the updated coverage section
-              updatedBody = `${updatedBody.trim()}\n\n### Test Coverage\n${table}`;
+              updatedBody = `${updatedBody.trim()}\n\n${fullCoverageReport}`;
               
-              // Debug - log the length to check if it's within GitHub's limits
-              console.log('PR description length:', updatedBody.length);
-              
-              // GitHub has a limit on PR description size, so we might need to truncate
-              // if it's too large (around 65536 characters)
+              // Check if PR description is too large
               if (updatedBody.length > 60000) {
-                console.log('PR description too large, truncating detailed report');
-                // Remove the detailed report and just keep the summary
-                const detailedReportIndex = updatedBody.indexOf('### Detailed Coverage Report');
-                if (detailedReportIndex !== -1) {
-                  updatedBody = updatedBody.substring(0, detailedReportIndex);
-                  updatedBody += '\n\n### Detailed Coverage Report\n\n*Report too large to display in PR description. See workflow logs for complete details.*';
-                }
+                console.log('PR description too large, using summary only');
+                // Just use the summary table
+                updatedBody = `${body.trim()}\n\n### Test Coverage\n${summaryTable}\n\n### Detailed Coverage Report\n\n*Report too large to display in PR description. See workflow logs for complete details.*`;
               }
               
               await github.rest.pulls.update({
