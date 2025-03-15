@@ -32,7 +32,7 @@ jobs:
       # Run tests and generate coverage
       - name: Run tests with coverage
         run: |
-          cd backend && npm run test:coverage -- --coverageReporters="json-summary" --no-cache
+          cd backend && npm run test:coverage -- --coverageReporters="json-summary" "text" --no-cache
         env:
           CI: true
 
@@ -46,24 +46,68 @@ jobs:
             const fs = require('fs');
             const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
             
-            // Create table header
-            let table = '| Metric | Coverage | Covered/Total |\\n|--------|----------|---------------|';
+            // Create summary table header
+            let summaryTable = '| Metric | Coverage | Covered/Total |\\n|--------|----------|---------------|';
             
             // Add rows for each metric in a specific order to ensure consistent output
             const metrics = ['lines', 'statements', 'functions', 'branches', 'branchesTrue'];
             for (const key of metrics) {
               if (summary.total[key]) {
                 const value = summary.total[key];
-                table += '\\n| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |';
+                summaryTable += '\\n| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |';
               }
             }
             
+            // Create detailed table with file-level coverage
+            let detailedTable = '\\n\\n### Detailed Coverage Report\\n\\n```\\n';
+            
+            // Capture the text output from the coverage report
+            try {
+              const textReport = fs.readFileSync('./coverage/text-summary.txt', 'utf8');
+              detailedTable += textReport;
+            } catch (e) {
+              // If text report doesn't exist, create our own detailed table
+              detailedTable += '---------------------------|---------|----------|---------|---------|----------------------\\n';
+              detailedTable += 'File                       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s    \\n';
+              detailedTable += '---------------------------|---------|----------|---------|---------|----------------------\\n';
+              
+              // Add All files row
+              const total = summary.total;
+              detailedTable += 'All files                  | ' + 
+                total.statements.pct.toFixed(2).padStart(6) + ' | ' + 
+                total.branches.pct.toFixed(2).padStart(8) + ' | ' + 
+                total.functions.pct.toFixed(2).padStart(7) + ' | ' + 
+                total.lines.pct.toFixed(2).padStart(7) + ' | ' + 
+                '                      \\n';
+              
+              // Add rows for each file
+              for (const [filePath, coverage] of Object.entries(summary)) {
+                if (filePath === 'total') continue;
+                
+                detailedTable += filePath.padEnd(28) + '| ' + 
+                  coverage.statements.pct.toFixed(2).padStart(6) + ' | ' + 
+                  coverage.branches.pct.toFixed(2).padStart(8) + ' | ' + 
+                  coverage.functions.pct.toFixed(2).padStart(7) + ' | ' + 
+                  coverage.lines.pct.toFixed(2).padStart(7) + ' | ' + 
+                  '                      \\n';
+              }
+              
+              detailedTable += '---------------------------|---------|----------|---------|---------|----------------------\\n';
+            }
+            
+            detailedTable += '```';
+            
+            // Combine tables
+            const fullTable = summaryTable + detailedTable;
+            
             // Write to file
-            fs.writeFileSync('coverage_table.txt', table);
+            fs.writeFileSync('coverage_table.txt', fullTable);
             
             // Print the table to the GitHub Actions log
             console.log('\n\n--- Coverage Summary ---');
-            console.log(table.replace(/\\n/g, '\n'));
+            console.log(summaryTable.replace(/\\n/g, '\n'));
+            console.log('\n\n--- Detailed Coverage Report ---');
+            console.log(detailedTable.replace(/\\n/g, '\n'));
             console.log('------------------------\n');
             
             // Use the new GitHub Actions environment file approach
