@@ -1,14 +1,13 @@
-name: Run Tests and Update PR with Coverage
+name: Run Tests with Coverage
 
 on:
   pull_request:
     branches:
       - main
 
-# Define permissions needed for GitHub API operations
+# Define permissions
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   test-and-coverage:
@@ -36,12 +35,11 @@ jobs:
         env:
           CI: true
 
-      # Generate summary coverage table
-      - name: Generate summary coverage table
-        id: summary_coverage
+      # Display coverage summary in logs
+      - name: Display coverage summary
         working-directory: ./backend
         run: |
-          # Create a formatted coverage table for summary metrics
+          # Display coverage summary in the logs
           node -e "
             const fs = require('fs');
             const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
@@ -58,115 +56,24 @@ jobs:
               }
             }
             
-            // Write to file
-            fs.writeFileSync('summary_table.txt', summaryTable);
-            
-            // Use the new GitHub Actions environment file approach
-            const envFile = process.env.GITHUB_OUTPUT;
-            fs.appendFileSync(envFile, 'summary_table_path=summary_table.txt\\n');
-            
             // Print the table to the GitHub Actions log
             console.log('\\n\\n--- Coverage Summary ---');
             console.log(summaryTable.replace(/\\\\n/g, '\\n'));
             console.log('------------------------\\n');
           "
 
-      # Capture the text coverage report
-      - name: Capture detailed coverage report
-        id: detailed_coverage
+      # Display detailed coverage report in logs
+      - name: Display detailed coverage report
         working-directory: ./backend
         run: |
-          # Run Jest with text reporter to capture the detailed report
-          npx jest --coverage --coverageReporters="text" --no-cache > coverage_detailed.txt
-          
-          # Format the detailed report for GitHub markdown
-          node -e "
-            const fs = require('fs');
-            let textReport = fs.readFileSync('coverage_detailed.txt', 'utf8');
-            
-            // Create a markdown code block with the text report
-            const detailedReport = '\\n\\n### Detailed Coverage Report\\n\\n```\\n' + textReport + '\\n```';
-            
-            // Write to file
-            fs.writeFileSync('detailed_report.txt', detailedReport);
-            
-            // Use the new GitHub Actions environment file approach
-            const envFile = process.env.GITHUB_OUTPUT;
-            fs.appendFileSync(envFile, 'detailed_report_path=detailed_report.txt\\n');
-            
-            // Print the report to the GitHub Actions log
-            console.log('\\n\\n--- Detailed Coverage Report ---');
-            console.log(textReport);
-            console.log('------------------------\\n');
-          "
+          # Display the detailed coverage report in the logs
+          npx jest --coverage --coverageReporters="text" --no-cache | tee /dev/tty | awk '{
+            print $0
+          }'
 
-      # Update PR description with coverage tables
-      - name: Update PR description with coverage
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            
-            // Read the summary table from file
-            const summaryPath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'summary_table.txt');
-            const summaryTable = fs.readFileSync(summaryPath, 'utf8');
-            
-            // Read the detailed report from file
-            const detailedPath = path.join(process.env.GITHUB_WORKSPACE, 'backend', 'detailed_report.txt');
-            const detailedReport = fs.readFileSync(detailedPath, 'utf8');
-            
-            // Combine them
-            const fullCoverageReport = `### Test Coverage\n${summaryTable}${detailedReport}`;
-            
-            const pr = context.payload.pull_request;
-            if (pr) {
-              const body = pr.body || '';
-              
-              // Check if there's already a coverage section and remove it
-              let updatedBody = body;
-              const coverageHeaderIndex = updatedBody.indexOf('### Test Coverage');
-              if (coverageHeaderIndex !== -1) {
-                // Find the next section header or use the end of the string
-                const nextHeaderIndex = updatedBody.indexOf('###', coverageHeaderIndex + 1);
-                if (nextHeaderIndex !== -1) {
-                  updatedBody = updatedBody.substring(0, coverageHeaderIndex) + updatedBody.substring(nextHeaderIndex);
-                } else {
-                  updatedBody = updatedBody.substring(0, coverageHeaderIndex);
-                }
-              }
-              
-              // Add the updated coverage section
-              updatedBody = `${updatedBody.trim()}\n\n${fullCoverageReport}`;
-              
-              // Check if PR description is too large
-              if (updatedBody.length > 60000) {
-                console.log('PR description too large, using summary only');
-                // Just use the summary table
-                updatedBody = `${body.trim()}\n\n### Test Coverage\n${summaryTable}\n\n### Detailed Coverage Report\n\n*Report too large to display in PR description. See workflow logs for complete details.*`;
-              }
-              
-              await github.rest.pulls.update({
-                ...context.repo,
-                pull_number: pr.number,
-                body: updatedBody
-              });
-            }
 
-      # Comment on PR if tests fail
-      - name: Comment on PR if tests fail
-        if: failure()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            if (pr) {
-              await github.rest.issues.createComment({
-                ...context.repo,
-                issue_number: pr.number,
-                body: '❌ Tests failed! Please fix the failing tests before merging this PR.'
-              });
-            }
+
+
 
       # Fail if tests fail
       - name: Fail if tests fail
