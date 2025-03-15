@@ -51,11 +51,30 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const table = `| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${{ steps.coverage.outputs.table }}`;
+            const table = `| Metric | Coverage | Covered/Total |
+|--------|----------|---------------|
+${{ steps.coverage.outputs.table }}`;
+            
             const pr = context.payload.pull_request;
             if (pr) {
               const body = pr.body || '';
-              const updatedBody = `${body}\n\n### Test Coverage\n${table}`;
+              
+              // Check if there's already a coverage section and remove it
+              let updatedBody = body;
+              const coverageHeaderIndex = updatedBody.indexOf('### Test Coverage');
+              if (coverageHeaderIndex !== -1) {
+                // Find the next section header or use the end of the string
+                const nextHeaderIndex = updatedBody.indexOf('###', coverageHeaderIndex + 1);
+                if (nextHeaderIndex !== -1) {
+                  updatedBody = updatedBody.substring(0, coverageHeaderIndex) + updatedBody.substring(nextHeaderIndex);
+                } else {
+                  updatedBody = updatedBody.substring(0, coverageHeaderIndex);
+                }
+              }
+              
+              // Add the updated coverage section
+              updatedBody = `${updatedBody.trim()}\n\n### Test Coverage\n${table}`;
+              
               await github.rest.pulls.update({
                 ...context.repo,
                 pull_number: pr.number,
