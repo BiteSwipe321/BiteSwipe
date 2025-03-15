@@ -72,22 +72,22 @@ jobs:
           npx jest --coverage --coverageReporters="text" --no-cache
           echo "::endgroup::"
           
-          # Save the step URL to the GitHub output
-          echo "step_number=$(( $GITHUB_JOB_EXECUTION_ATTEMPT * 100 + $GITHUB_STEP_NUMBER ))" >> $GITHUB_OUTPUT
+          # We don't need to save the step number anymore, just using the run ID is sufficient
+          echo "workflow_run_id=$GITHUB_RUN_ID" >> $GITHUB_OUTPUT
       
       # Add a comment with a link to the coverage report
       - name: Add coverage report link to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
         env:
-          STEP_NUMBER: ${{ steps.detailed_coverage.outputs.step_number }}
+          WORKFLOW_RUN_ID: ${{ steps.detailed_coverage.outputs.workflow_run_id }}
         with:
           script: |
             const pr = context.payload.pull_request;
             if (pr) {
-              const runId = context.runId;
+              const workflowRunId = process.env.WORKFLOW_RUN_ID || context.runId; // Get from previous step
+              const runId = workflowRunId;
               const jobName = 'test-and-coverage';
-              const stepNumber = process.env.STEP_NUMBER || ''; // Get from previous step
               
               // Create the URL to the specific step in the workflow run
               const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
