@@ -51,7 +51,10 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const table = "| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${{ steps.coverage.outputs.table }}";
+            // Split the multiline string handling to avoid syntax errors
+            const tableHeader = "| Metric | Coverage | Covered/Total |\\n|--------|----------|---------------|\\n";
+            const coverageData = process.env.COVERAGE_DATA;
+            const table = tableHeader + coverageData;
             
             const pr = context.payload.pull_request;
             if (pr) {
@@ -79,6 +82,8 @@ jobs:
                 body: updatedBody
               });
             }
+        env:
+          COVERAGE_DATA: ${{ steps.coverage.outputs.table }}
 
       # Comment on PR if tests fail
       - name: Comment on PR if tests fail
