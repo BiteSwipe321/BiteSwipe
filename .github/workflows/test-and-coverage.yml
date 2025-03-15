@@ -34,8 +34,9 @@ jobs:
       # Extract coverage summary
       - name: Extract coverage summary
         id: coverage
+        working-directory: ./backend
         run: |
-          cd backend && node -e "
+          node -e "
           const fs = require('fs');
           const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
           const table = Object.entries(summary.total).map(([key, value]) => {
