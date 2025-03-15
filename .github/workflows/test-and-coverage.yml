@@ -51,9 +51,7 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const table = `| Metric | Coverage | Covered/Total |
-|--------|----------|---------------|
-${{ steps.coverage.outputs.table }}`;
+            const table = "| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${{ steps.coverage.outputs.table }}";
             
             const pr = context.payload.pull_request;
             if (pr) {
