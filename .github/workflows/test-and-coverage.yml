@@ -5,9 +5,10 @@ on:
     branches:
       - main
 
-# Define permissions
+# Define permissions needed for GitHub API operations
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   test-and-coverage:
@@ -64,17 +65,43 @@ jobs:
 
       # Display detailed coverage report in logs
       - name: Display detailed coverage report
+        id: detailed_coverage
         working-directory: ./backend
         run: |
-          # Display the detailed coverage report in the logs
-          npx jest --coverage --coverageReporters="text" --no-cache | tee /dev/tty | awk '{
-            print $0
-          }'
-
-
-
-
-
+          echo "::group::Detailed Coverage Report"
+          npx jest --coverage --coverageReporters="text" --no-cache
+          echo "::endgroup::"
+          
+          # Save the step URL to the GitHub output
+          echo "step_number=$(( $GITHUB_JOB_EXECUTION_ATTEMPT * 100 + $GITHUB_STEP_NUMBER ))" >> $GITHUB_OUTPUT
+      
+      # Add a comment with a link to the coverage report
+      - name: Add coverage report link to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        env:
+          STEP_NUMBER: ${{ steps.detailed_coverage.outputs.step_number }}
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr) {
+              const runId = context.runId;
+              const jobName = 'test-and-coverage';
+              const stepNumber = process.env.STEP_NUMBER || ''; // Get from previous step
+              
+              // Create the URL to the specific step in the workflow run
+              const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+              
+              // Create a comment with links to both summary and detailed reports
+              const comment = "## Test Coverage Report\n\n📊 [View detailed coverage report in workflow logs](" + workflowUrl + ")";
+              
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: pr.number,
+                body: comment
+              });
+            }
+      
       # Fail if tests fail
       - name: Fail if tests fail
         if: failure()
