@@ -36,7 +36,10 @@ jobs:
         id: coverage
         working-directory: ./backend
         run: |
-          echo "table=$(node -e "const fs = require('fs'); const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8')); const table = Object.entries(summary.total).map(([key, value]) => { return '| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |'; }).join('\n'); console.log(table);" )" >> $GITHUB_OUTPUT
+          # Create a multiline string with delimiters
+          echo 'table<<EOF' >> $GITHUB_OUTPUT
+          node -e "const fs = require('fs'); const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8')); const table = Object.entries(summary.total).map(([key, value]) => { return '| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |'; }).join('\n'); console.log(table);" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
 
       # Update PR description with coverage table
       - name: Update PR description with coverage
