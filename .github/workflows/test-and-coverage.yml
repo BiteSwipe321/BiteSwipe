@@ -47,18 +47,23 @@ jobs:
             const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
             
             // Create table header
-            let table = '| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n';
+            let table = '| Metric | Coverage | Covered/Total |\\n|--------|----------|---------------|';
             
-            // Add rows for each metric
-            for (const [key, value] of Object.entries(summary.total)) {
-              table += '| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |\n';
+            // Add rows for each metric in a specific order to ensure consistent output
+            const metrics = ['lines', 'statements', 'functions', 'branches', 'branchesTrue'];
+            for (const key of metrics) {
+              if (summary.total[key]) {
+                const value = summary.total[key];
+                table += '\\n| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |';
+              }
             }
             
             // Write to file
             fs.writeFileSync('coverage_table.txt', table);
             
-            // Also output the path for GitHub Actions
-            console.log('::set-output name=table_path::coverage_table.txt');
+            // Use the new GitHub Actions environment file approach
+            const envFile = process.env.GITHUB_OUTPUT;
+            fs.appendFileSync(envFile, 'table_path=coverage_table.txt\\n');
           "
 
       # Update PR description with coverage table
