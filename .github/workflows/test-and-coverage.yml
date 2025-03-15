@@ -46,7 +46,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { context, github } = require('@actions/github');
             const table = `| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|\n${{ steps.coverage.outputs.table }}`;
             const pr = context.payload.pull_request;
             if (pr) {
@@ -65,7 +64,6 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { context, github } = require('@actions/github');
             const pr = context.payload.pull_request;
             if (pr) {
               await github.rest.issues.createComment({
