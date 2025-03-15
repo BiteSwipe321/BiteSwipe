@@ -61,6 +61,11 @@ jobs:
             // Write to file
             fs.writeFileSync('coverage_table.txt', table);
             
+            // Print the table to the GitHub Actions log
+            console.log('\n\n--- Coverage Summary ---');
+            console.log(table.replace(/\\n/g, '\n'));
+            console.log('------------------------\n');
+            
             // Use the new GitHub Actions environment file approach
             const envFile = process.env.GITHUB_OUTPUT;
             fs.appendFileSync(envFile, 'table_path=coverage_table.txt\\n');
