@@ -282,6 +282,7 @@ describe('Firebase Error Handling', () => {
 
 // PART 3: Mock Messaging Tests
 describe('Firebase Mock Messaging', () => {
+  // Setup for all tests
   // Setup before tests
   beforeEach(() => {
     // Save original values
@@ -405,5 +406,88 @@ describe('Firebase Mock Messaging', () => {
     
     // Verify log message
     expect(console.log).toHaveBeenCalledWith('Mock Firebase messaging: multicast message would be sent here');
+  });
+
+  // Input: Firebase module with messaging explicitly set to null
+  // Expected behavior: Should trigger the else branch in getMessaging function
+  // Expected output: Mock messaging object and log message
+  test('should explicitly test the else branch in getMessaging when messaging is null', () => {
+    // Since we've exported the messaging variable, we can directly manipulate it
+    // to test both branches of the getMessaging function
+    
+    // First, save the original module and unmock it
+    const originalMock = jest.requireMock('../../config/firebase');
+    jest.unmock('../../config/firebase');
+    
+    // Reset modules to ensure we get a fresh copy
+    jest.resetModules();
+    
+    // Clear console.log mock
+    (console.log as jest.Mock).mockClear();
+    
+    // Import the actual firebase module with the exported messaging variable
+    const firebase = require('../../config/firebase');
+    
+    // Set messaging to null to force the else branch
+    firebase.messaging = null;
+    
+    // Call getMessaging which should now go through the else branch
+    const mockMessaging = firebase.getMessaging();
+    
+    // Verify the log message for the else branch
+    expect(console.log).toHaveBeenCalledWith('Using mock Firebase messaging');
+    
+    // Verify it's a mock implementation
+    expect(mockMessaging).toBeDefined();
+    expect(typeof mockMessaging.send).toBe('function');
+    expect(typeof mockMessaging.sendMulticast).toBe('function');
+    
+    // Test the mock send method
+    mockMessaging.send({ token: 'test-token' });
+    
+    // Verify the mock implementation was used
+    expect(console.log).toHaveBeenCalledWith('Mock Firebase messaging: message would be sent here');
+    
+    // Restore the original mock to not affect other tests
+    jest.doMock('../../config/firebase', () => originalMock);
+  });
+  
+  // Input: Firebase module with messaging already initialized
+  // Expected behavior: Should trigger the if (messaging) branch in getMessaging function
+  // Expected output: The existing messaging object
+  test('should explicitly test the if (messaging) branch in getMessaging when messaging is not null', () => {
+    // First, save the original module and unmock it
+    const originalMock = jest.requireMock('../../config/firebase');
+    jest.unmock('../../config/firebase');
+    
+    // Reset modules to ensure we get a fresh copy
+    jest.resetModules();
+    
+    // Clear console.log mock
+    (console.log as jest.Mock).mockClear();
+    
+    // Import the actual firebase module with the exported messaging variable
+    const firebase = require('../../config/firebase');
+    
+    // Create a mock messaging object
+    const mockMessagingObj = {
+      send: jest.fn().mockResolvedValue('mock-message-id'),
+      sendMulticast: jest.fn().mockResolvedValue({ successCount: 1, failureCount: 0, responses: [] })
+    };
+    
+    // Set messaging to our mock object to force the if branch
+    firebase.messaging = mockMessagingObj;
+    
+    // Call getMessaging which should now go through the if branch
+    const returnedMessaging = firebase.getMessaging();
+    
+    // Verify that console.log was NOT called (since we're in the if branch)
+    expect(console.log).not.toHaveBeenCalledWith('Using mock Firebase messaging');
+    
+    // Verify that the returned object is the same as our mock
+    expect(returnedMessaging).toBe(mockMessagingObj);
+    
+    // Restore the original mock to not affect other tests
+    jest.doMock('../../config/firebase', () => originalMock);
   });
 });
