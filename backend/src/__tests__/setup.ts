@@ -54,7 +54,8 @@ const mockRestaurantService = {
 const mockUserService = {
   getUserById: jest.fn(),
   createUser: jest.fn(),
-  getUserByEmail: jest.fn()
+  getUserByEmail: jest.fn(),
+  updateFCMToken: jest.fn()
 };
 
 const mockSessionManager = {
