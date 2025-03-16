@@ -1,8 +1,25 @@
+import '../setup';
+
+// Mock mongoose first
+const mockObjectId = jest.fn().mockImplementation((id) => id || 'mock-id');
+jest.mock('mongoose', () => ({
+  Schema: jest.fn(),
+  model: jest.fn(),
+  Types: {
+    ObjectId: mockObjectId
+  },
+  connect: jest.fn(),
+  connection: {
+    close: jest.fn()
+  }
+}));
+
+// Import mongoose after mocking
 import mongoose from 'mongoose';
 
-// Mock the Session import first
+// Mock the Session import
 jest.mock('../../models/session', () => {
-  // Create a simple mock Session class
+  // Create a mock Session class with schema definition
   class MockSession {
     joinCode: string;
     creator: any;
@@ -83,42 +100,117 @@ jest.mock('../../models/session', () => {
           restaurants: { instance: 'Array' },
           createdAt: { instance: 'Date', options: { default: Date.now } },
           expiresAt: { instance: 'Date', options: { required: true } }
+        },
+        definition: {
+          joinCode: { type: String, unique: true, index: true },
+          creator: { 
+            type: String, // Using String instead of ObjectId for simplicity
+            ref: 'User',
+            required: true 
+          },
+          participants: [{
+            userId: { 
+              type: String, 
+              ref: 'User',
+              required: true 
+            },
+            preferences: [{
+              restaurantId: String,
+              liked: Boolean,
+              timestamp: Date
+            }]
+          }],
+          pendingInvitations: [{ 
+            type: String, 
+            ref: 'User' 
+          }],
+          status: {
+            type: String,
+            enum: ['CREATED', 'MATCHING', 'COMPLETED'],
+            default: 'CREATED'
+          },
+          settings: {
+            location: {
+              latitude: { type: Number, required: true },
+              longitude: { type: Number, required: true },
+              radius: { type: Number, required: true }
+            }
+          },
+          restaurants: [{
+            restaurantId: { 
+              type: String,
+              ref: 'Restaurant',
+              required: true 
+            },
+            score: { type: Number, default: 0 },
+            totalVotes: { type: Number, default: 0 },
+            positiveVotes: { type: Number, default: 0 }
+          }],
+          finalSelection: {
+            restaurantId: { 
+              type: String,
+              ref: 'Restaurant'
+            },
+            selectedAt: Date
+          },
+          doneSwiping: [{ 
+            type: String, 
+            ref: 'User' 
+          }],
+          createdAt: { type: Date, default: Date.now },
+          expiresAt: { type: Date, required: true }
         }
       };
+    }
+
+    // Mock save method
+    async save() {
+      return this;
+    }
+
+    // Static methods
+    static deleteMany() {
+      return Promise.resolve({ deletedCount: 0 });
+    }
+
+    static findById() {
+      return Promise.resolve(null);
+    }
+
+    static findOne() {
+      return Promise.resolve(null);
     }
   }
 
   return {
     Session: MockSession,
-    SessionStatus: ['CREATED', 'ACTIVE', 'MATCHING', 'COMPLETED']
-  };
-});
-
-// Now import the mocked Session
-import { Session, ISession, SessionStatus } from '../../models/session';
-
-// Mock mongoose
-jest.mock('mongoose', () => {
-  return {
-    model: jest.fn().mockReturnValue({
-      findById: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-      create: jest.fn()
-    }),
-    Schema: jest.fn(),
-    Types: {
-      ObjectId: jest.fn().mockImplementation((id) => id || 'mock-id')
+    SessionStatus: {
+      CREATED: 'CREATED',
+      MATCHING: 'MATCHING',
+      COMPLETED: 'COMPLETED'
     }
   };
 });
 
-// Tests for the Session model
-describe('Session Model', () => {
+// Import the mocked Session model
+import { Session, SessionStatus } from '../../models/session';
+
+// Interface: Session Model
+describe('Mocked: Session Model', () => {
+  // Clear mocks before each test
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  // Input: None
+  // Expected behavior: Session model is defined
+  // Expected output: Session model is not null
   test('should create a Session model', () => {
     expect(Session).toBeDefined();
   });
 
+  // Input: Empty session object
+  // Expected behavior: Session is created with default status
+  // Expected output: Session with status 'CREATED'
   test('should have correct default value for status', () => {
     // Create a new session without specifying status
     const session = new Session();
@@ -127,6 +219,9 @@ describe('Session Model', () => {
     expect(session.status).toBe('CREATED');
   });
 
+  // Input: Session data with required fields
+  // Expected behavior: Session is created with provided values
+  // Expected output: Session object with all fields matching input
   test('should create a session with provided values', () => {
     // Create a new session with minimum required fields
     const sessionData = {
@@ -157,17 +252,21 @@ describe('Session Model', () => {
     expect(session.doneSwiping).toEqual([]);
   });
 
+  // Input: None
+  // Expected behavior: SessionStatus type is validated
+  // Expected output: SessionStatus contains expected enum values
   test('should validate SessionStatus type', () => {
-    // This is a TypeScript type check, not a runtime check
-    const validStatuses: SessionStatus[] = ['CREATED', 'ACTIVE', 'MATCHING', 'COMPLETED'];
-    
-    // Just verify that the array contains the expected values
-    expect(validStatuses).toContain('CREATED');
-    expect(validStatuses).toContain('ACTIVE');
-    expect(validStatuses).toContain('MATCHING');
-    expect(validStatuses).toContain('COMPLETED');
+    // Since SessionStatus is imported as a type, we need to validate it indirectly
+    // through the mock implementation
+    const mockSessionStatus = jest.requireMock('../../models/session').SessionStatus;
+    expect(mockSessionStatus.CREATED).toBe('CREATED');
+    expect(mockSessionStatus.MATCHING).toBe('MATCHING');
+    expect(mockSessionStatus.COMPLETED).toBe('COMPLETED');
   });
 
+  // Input: None
+  // Expected behavior: Schema contains all required fields
+  // Expected output: All required fields are defined in the schema
   test('should have correct schema fields', () => {
     // Get the schema paths
     const session = new Session();
@@ -187,6 +286,9 @@ describe('Session Model', () => {
     expect(paths.expiresAt).toBeDefined();
   });
 
+  // Input: None
+  // Expected behavior: Schema fields have correct types
+  // Expected output: All fields have the expected types
   test('should have correct field types', () => {
     const session = new Session();
     const paths = session.schema.paths;
@@ -205,6 +307,9 @@ describe('Session Model', () => {
     expect(paths.expiresAt.instance).toBe('Date');
   });
 
+  // Input: None
+  // Expected behavior: Status field has correct enum values
+  // Expected output: Status enum contains expected values
   test('should have correct enum values for status', () => {
     const session = new Session();
     const statusOptions = session.schema.path('status').options;
@@ -213,6 +318,9 @@ describe('Session Model', () => {
     expect(statusOptions.enum).toEqual(['CREATED', 'MATCHING', 'COMPLETED']);
   });
 
+  // Input: None
+  // Expected behavior: joinCode field is unique and indexed
+  // Expected output: joinCode has unique and index options set to true
   test('should have unique and indexed joinCode field', () => {
     const session = new Session();
     const joinCodeOptions = session.schema.path('joinCode').options;
@@ -221,6 +329,9 @@ describe('Session Model', () => {
     expect(joinCodeOptions.index).toBe(true);
   });
 
+  // Input: None
+  // Expected behavior: creator field is required and references User model
+  // Expected output: creator has required=true and ref='User'
   test('should have required creator field with User reference', () => {
     const session = new Session();
     const creatorOptions = session.schema.path('creator').options;
@@ -229,6 +340,9 @@ describe('Session Model', () => {
     expect(creatorOptions.ref).toBe('User');
   });
 
+  // Input: None
+  // Expected behavior: Location settings fields are required
+  // Expected output: All location fields have required=true
   test('should have required location settings fields', () => {
     // Since we're mocking the schema, we'll just verify that our mock has the right structure
     // for the location settings fields
@@ -245,6 +359,9 @@ describe('Session Model', () => {
     expect(paths['settings.location.radius'].options.required).toBe(true);
   });
 
+  // Input: None
+  // Expected behavior: expiresAt field is required
+  // Expected output: expiresAt has required=true
   test('should have required expiresAt field', () => {
     const session = new Session();
     const expiresAtOptions = session.schema.path('expiresAt').options;
@@ -252,6 +369,9 @@ describe('Session Model', () => {
     expect(expiresAtOptions.required).toBe(true);
   });
 
+  // Input: None
+  // Expected behavior: createdAt field has default value
+  // Expected output: createdAt has default=Date.now
   test('should have default value for createdAt field', () => {
     const session = new Session();
     const paths = session.schema.paths;
@@ -261,6 +381,9 @@ describe('Session Model', () => {
     expect(paths.createdAt.options.default).toBe(Date.now);
   });
 
+  // Input: Session data with participants array
+  // Expected behavior: Session is created with participants
+  // Expected output: Session object with participants matching input
   test('should create a session with participants', () => {
     const userId = new mongoose.Types.ObjectId();
     const sessionData = {
@@ -297,6 +420,9 @@ describe('Session Model', () => {
     expect(session.participants[0].preferences[0].liked).toBe(true);
   });
 
+  // Input: Session data with restaurants array
+  // Expected behavior: Session is created with restaurants
+  // Expected output: Session object with restaurants matching input
   test('should create a session with restaurants', () => {
     const restaurantId = new mongoose.Types.ObjectId();
     const sessionData = {
@@ -329,6 +455,9 @@ describe('Session Model', () => {
     expect(session.restaurants[0].positiveVotes).toBe(8);
   });
 
+  // Input: Session data with finalSelection object
+  // Expected behavior: Session is created with finalSelection
+  // Expected output: Session object with finalSelection matching input
   test('should create a session with finalSelection', () => {
     const restaurantId = new mongoose.Types.ObjectId();
     const selectedAt = new Date();
@@ -354,5 +483,106 @@ describe('Session Model', () => {
     expect(session.finalSelection).toBeDefined();
     expect(session.finalSelection?.restaurantId).toEqual(restaurantId);
     expect(session.finalSelection?.selectedAt).toEqual(selectedAt);
+  });
+
+  // Input: Session data with pendingInvitations array
+  // Expected behavior: Session is created with pendingInvitations
+  // Expected output: Session object with pendingInvitations matching input
+  test('should create a session with pendingInvitations', () => {
+    const userId1 = new mongoose.Types.ObjectId();
+    const userId2 = new mongoose.Types.ObjectId();
+    const sessionData = {
+      joinCode: 'ABC123',
+      creator: new mongoose.Types.ObjectId(),
+      pendingInvitations: [userId1, userId2],
+      settings: {
+        location: {
+          latitude: 49.2827,
+          longitude: -123.1207,
+          radius: 5000
+        }
+      },
+      expiresAt: new Date()
+    };
+    
+    const session = new Session(sessionData);
+    
+    expect(session.pendingInvitations).toHaveLength(2);
+    expect(session.pendingInvitations[0]).toEqual(userId1);
+    expect(session.pendingInvitations[1]).toEqual(userId2);
+  });
+
+  // Input: Session data with doneSwiping array
+  // Expected behavior: Session is created with doneSwiping users
+  // Expected output: Session object with doneSwiping matching input
+  test('should create a session with doneSwiping users', () => {
+    const userId1 = new mongoose.Types.ObjectId();
+    const userId2 = new mongoose.Types.ObjectId();
+    const sessionData = {
+      joinCode: 'ABC123',
+      creator: new mongoose.Types.ObjectId(),
+      doneSwiping: [userId1, userId2],
+      settings: {
+        location: {
+          latitude: 49.2827,
+          longitude: -123.1207,
+          radius: 5000
+        }
+      },
+      expiresAt: new Date()
+    };
+    
+    const session = new Session(sessionData);
+    
+    expect(session.doneSwiping).toHaveLength(2);
+    expect(session.doneSwiping[0]).toEqual(userId1);
+    expect(session.doneSwiping[1]).toEqual(userId2);
+  });
+
+  // Input: Session data with custom status
+  // Expected behavior: Session is created with specified status
+  // Expected output: Session object with status matching input
+  test('should create a session with custom status', () => {
+    const sessionData = {
+      joinCode: 'ABC123',
+      creator: new mongoose.Types.ObjectId(),
+      status: 'MATCHING',
+      settings: {
+        location: {
+          latitude: 49.2827,
+          longitude: -123.1207,
+          radius: 5000
+        }
+      },
+      expiresAt: new Date()
+    };
+    
+    const session = new Session(sessionData);
+    
+    expect(session.status).toBe('MATCHING');
+  });
+
+  // Input: Session data with custom createdAt date
+  // Expected behavior: Session is created with specified createdAt
+  // Expected output: Session object with createdAt matching input
+  test('should create a session with custom createdAt date', () => {
+    const customDate = new Date('2023-01-01T00:00:00Z');
+    const sessionData = {
+      joinCode: 'ABC123',
+      creator: new mongoose.Types.ObjectId(),
+      createdAt: customDate,
+      settings: {
+        location: {
+          latitude: 49.2827,
+          longitude: -123.1207,
+          radius: 5000
+        }
+      },
+      expiresAt: new Date()
+    };
+    
+    const session = new Session(sessionData);
+    
+    expect(session.createdAt).toEqual(customDate);
   });
 });
