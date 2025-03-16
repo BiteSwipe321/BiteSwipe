@@ -48,7 +48,9 @@ jest.mock('../config/firebase', () => ({
 
 // Mock singleton services
 const mockRestaurantService = {
-  getRestaurants: jest.fn()
+  getRestaurants: jest.fn(),
+  getRestaurant: jest.fn(),
+  addRestaurants: jest.fn()
 };
 
 const mockUserService = {
