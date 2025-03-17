@@ -1,20 +1,13 @@
 import { UserService } from '../../services/userService';
 import {mockUserModel} from '../setup';
 
-// MUST KEEP.
+// MUST KEEP. We need to undo the mock from the setup since we are testing the unmocked version
 jest.unmock('../../services/userService');
-
-
-
 
 // Create a function to mock the lean() method that all query methods should return
 const createMockWithLean = (returnValue: any) => ({
   lean: jest.fn().mockResolvedValue(returnValue)
 });
-
-
-
-
 
 describe('UserService - Mocked Tests', () => {
   let userService: UserService;
@@ -64,44 +57,44 @@ describe('UserService - Mocked Tests', () => {
     });
   });
 
-  // describe('createUser', () => {
-  //   test('should successfully create a new user', async () => {
-  //     // Input: Valid email and displayName
-  //     // Expected behavior: User is created after checking no existing user
-  //     // Expected output: Newly created user object
+  describe('createUser', () => {
+    test('should successfully create a new user', async () => {
+      // Input: Valid email and displayName
+      // Expected behavior: User is created after checking no existing user
+      // Expected output: Newly created user object
       
-  //     // Test data
-  //     const email = 'test@example.com';
-  //     const displayName = 'Test User';
+      // Test data
+      const email = 'test@example.com';
+      const displayName = 'Test User';
       
-  //     // Mock user returned from create
-  //     const mockUser = {
-  //       _id: 'new-user-id',
-  //       email,
-  //       displayName,
-  //       sessionHistory: [],
-  //       restaurantInteractions: []
-  //     };
+      // Mock user returned from create
+      const mockUser = {
+        _id: 'new-user-id',
+        email,
+        displayName,
+        sessionHistory: [],
+        restaurantInteractions: []
+      };
       
-  //     // Mock getUserByEmail to return null (no existing user)
-  //     mockLean.mockResolvedValueOnce(null);
+      // Mock getUserByEmail to return null (no existing user)
+      mockUserModel.findOne.mockReturnValueOnce(createMockWithLean(null));
       
-  //     // Mock create to return the new user
-  //     mockCreate.mockResolvedValueOnce(mockUser);
+      // Mock create to return the new user
+      mockUserModel.create.mockResolvedValueOnce(mockUser);
 
-  //     // Call the method
-  //     const result = await userService.createUser(email, displayName);
+      // Call the method
+      const result = await userService.createUser(email, displayName);
 
-  //     // Assertions
-  //     expect(result).toEqual(mockUser);
-  //     expect(mockFindOne).toHaveBeenCalledWith({ email });
-  //     expect(mockCreate).toHaveBeenCalledWith({
-  //       email,
-  //       displayName,
-  //       sessionHistory: [],
-  //       restaurantInteractions: []
-  //     });
-  //   });
+      // Assertions
+      expect(result).toEqual(mockUser);
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({ email });
+      expect(mockUserModel.create).toHaveBeenCalledWith({
+        email,
+        displayName,
+        sessionHistory: [],
+        restaurantInteractions: []
+      });
+    });
 
   //   test('should throw error when user already exists', async () => {
   //     // Input: Email that already exists in database
@@ -158,7 +151,7 @@ describe('UserService - Mocked Tests', () => {
       
   //     expect(consoleErrorSpy).toHaveBeenCalled();
   //   });
-  // });
+  });
 
   // describe('getUserById', () => {
   //   test('should successfully get a user by ID', async () => {
