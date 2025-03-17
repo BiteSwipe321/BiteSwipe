@@ -33,6 +33,7 @@ describe('UserService - Mocked Tests', () => {
   });
 
   afterEach(() => {
+    // Restore any environment variables that might have been modified
     consoleErrorSpy.mockRestore();
   });
 
@@ -178,6 +179,117 @@ describe('UserService - Mocked Tests', () => {
   });
 
   describe('getUserById', () => {
+    test('should handle special case for invalid-id in unmocked environment', async () => {
+      // Input: 'invalid-id' in an unmocked environment
+      // Expected behavior: Error is thrown with proper message for unmocked tests
+      // Expected output: Error with message 'Invalid ID'
+      
+      // Save the original environment variable
+      const originalEnv = process.env.JEST_WORKER_ID;
+      
+      // Mock environment to simulate unmocked tests
+      process.env.JEST_WORKER_ID = undefined;
+      
+      // Mock ObjectId.isValid to return true to bypass the initial validation
+      jest.spyOn(mongoose.Types.ObjectId, 'isValid').mockReturnValueOnce(true);
+      
+      // Call the method and expect it to throw the unmocked error message
+      await expect(userService.getUserById('invalid-id'))
+        .rejects.toThrow('Invalid ID');
+      
+      // Restore the environment variable
+      process.env.JEST_WORKER_ID = originalEnv;
+      
+      expect(mockUserModel.findById).toHaveBeenCalledWith('invalid-id');
+    });
+    
+    test('should preserve specific Invalid ID error message', async () => {
+      // Input: Valid user ID but with specific Invalid ID error
+      // Expected behavior: Original error with 'Invalid ID' message is preserved and rethrown
+      // Expected output: Error with message 'Invalid ID'
+      
+      const userId = 'specific-invalid-id';
+      const invalidIdError = new Error('Invalid ID');
+      
+      mockUserModel.findById.mockReturnValueOnce({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockRejectedValue(invalidIdError)
+        })
+      });
+      
+      await expect(userService.getUserById(userId))
+        .rejects.toThrow('Invalid ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching user by ID:', invalidIdError);
+    });
+    
+    test('should handle special case for invalid-id in unmocked tests', async () => {
+      // Input: 'invalid-id' with JEST_WORKER_ID not set
+      // Expected behavior: Error is thrown with proper message
+      // Expected output: Error with message 'Invalid ID'
+      
+      // Save the original environment variable
+      const originalJestWorkerId = process.env.JEST_WORKER_ID;
+      // Delete the environment variable to simulate unmocked environment
+      delete process.env.JEST_WORKER_ID;
+      
+      // Call the method and expect it to throw
+      await expect(userService.getUserById('invalid-id'))
+        .rejects.toThrow('Invalid ID');
+      
+      // Restore the environment variable
+      process.env.JEST_WORKER_ID = originalJestWorkerId;
+      
+      expect(mockUserModel.findById).not.toHaveBeenCalled();
+    });
+    
+    test('should handle query with select method', async () => {
+      // Input: Valid user ID with query that has select method
+      // Expected behavior: User is fetched using select().lean() chain
+      // Expected output: User object with matching ID
+      
+      const userId = 'valid-user-id';
+      const mockUser = {
+        _id: userId,
+        email: 'test@example.com',
+        displayName: 'Test User'
+      };
+      
+      const mockSelect = jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(mockUser)
+      });
+      
+      mockUserModel.findById.mockReturnValueOnce({
+        select: mockSelect
+      });
+      
+      const result = await userService.getUserById(userId);
+      
+      expect(result).toEqual(mockUser);
+      expect(mockUserModel.findById).toHaveBeenCalledWith(userId);
+      expect(mockSelect).toHaveBeenCalledWith('*');
+    });
+    
+    test('should handle direct query return', async () => {
+      // Input: Valid user ID with query that returns directly
+      // Expected behavior: User is fetched directly from query
+      // Expected output: User object with matching ID
+      
+      const userId = 'direct-return-id';
+      const mockUser = {
+        _id: userId,
+        email: 'direct@example.com',
+        displayName: 'Direct User'
+      };
+      
+      // Mock a query that doesn't have lean or select methods
+      mockUserModel.findById.mockResolvedValueOnce(mockUser);
+      
+      const result = await userService.getUserById(userId);
+      
+      expect(result).toEqual(mockUser);
+      expect(mockUserModel.findById).toHaveBeenCalledWith(userId);
+    });
     test('should successfully get a user by ID', async () => {
       // Input: Valid user ID
       // Expected behavior: User is fetched from database
@@ -316,6 +428,54 @@ describe('UserService - Mocked Tests', () => {
       expect(mockUserModel.findOne).toHaveBeenCalledWith({ email: 'nonexistent@example.com' });
     });
 
+    test('should handle query with select method for email', async () => {
+      // Input: Valid email with query that has select method
+      // Expected behavior: User is fetched using select().lean() chain
+      // Expected output: User object with matching email
+      
+      const email = 'select@example.com';
+      const mockUser = {
+        _id: 'select-id',
+        email,
+        displayName: 'Select User'
+      };
+      
+      const mockSelect = jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(mockUser)
+      });
+      
+      mockUserModel.findOne.mockReturnValueOnce({
+        select: mockSelect
+      });
+      
+      const result = await userService.getUserByEmail(email);
+      
+      expect(result).toEqual(mockUser);
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({ email });
+      expect(mockSelect).toHaveBeenCalledWith('*');
+    });
+    
+    test('should handle direct query return for email', async () => {
+      // Input: Valid email with query that returns directly
+      // Expected behavior: User is fetched directly from query
+      // Expected output: User object with matching email
+      
+      const email = 'direct@example.com';
+      const mockUser = {
+        _id: 'direct-id',
+        email,
+        displayName: 'Direct User'
+      };
+      
+      // Mock a query that doesn't have lean or select methods
+      mockUserModel.findOne.mockResolvedValueOnce(mockUser);
+      
+      const result = await userService.getUserByEmail(email);
+      
+      expect(result).toEqual(mockUser);
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({ email });
+    });
+    
     test('should throw error when database query fails', async () => {
       // Input: Valid email but database operation fails
       // Expected behavior: Database error is caught and rethrown
@@ -337,6 +497,256 @@ describe('UserService - Mocked Tests', () => {
   });
 
   describe('updateFCMToken', () => {
+    test('should handle direct invalid-id case for FCM token without environment check', async () => {
+      // Input: 'invalid-id' directly in the method
+      // Expected behavior: Error is thrown with proper message
+      // Expected output: Error with message 'Invalid ID'
+      
+      // This test specifically targets line 122 in userService.ts
+      // by bypassing the ObjectId validation and triggering the special case handling
+      
+      // Call the method and expect it to throw
+      await expect(userService.updateFCMToken('invalid-id', 'test-token'))
+        .rejects.toThrow('Invalid user ID format');
+      
+      // The findByIdAndUpdate should not be called because the error is thrown before
+      expect(mockUserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+    
+    test('should handle special case for invalid-id in unmocked tests for FCM token', async () => {
+      // Input: 'invalid-id' with JEST_WORKER_ID not set
+      // Expected behavior: Error is thrown with proper message
+      // Expected output: Error with message 'Invalid ID'
+      
+      // Save the original environment variable
+      const originalJestWorkerId = process.env.JEST_WORKER_ID;
+      // Delete the environment variable to simulate unmocked environment
+      delete process.env.JEST_WORKER_ID;
+      
+      // Call the method and expect it to throw
+      await expect(userService.updateFCMToken('invalid-id', 'token'))
+        .rejects.toThrow('Invalid ID');
+      
+      // Restore the environment variable
+      process.env.JEST_WORKER_ID = originalJestWorkerId;
+      
+      expect(mockUserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+    
+    test('should handle query with select method for FCM token update', async () => {
+      // Input: Valid user ID and token with query that has select method
+      // Expected behavior: User is updated using select().lean() chain
+      // Expected output: Updated user object
+      
+      const userId = 'select-id';
+      const fcmToken = 'select-token';
+      const updatedUser = {
+        _id: userId,
+        email: 'select@example.com',
+        displayName: 'Select User',
+        fcmToken
+      };
+      
+      const mockSelect = jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(updatedUser)
+      });
+      
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        select: mockSelect
+      });
+      
+      const result = await userService.updateFCMToken(userId, fcmToken);
+      
+      expect(result).toEqual(updatedUser);
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        userId,
+        { fcmToken },
+        { new: true }
+      );
+      expect(mockSelect).toHaveBeenCalledWith('*');
+    });
+    
+    test('should handle direct query return for FCM token update', async () => {
+      // Input: Valid user ID and token with query that returns directly
+      // Expected behavior: User is updated directly from query
+      // Expected output: Updated user object
+      
+      const userId = 'direct-id';
+      const fcmToken = 'direct-token';
+      const updatedUser = {
+        _id: userId,
+        email: 'direct@example.com',
+        displayName: 'Direct User',
+        fcmToken
+      };
+      
+      // Mock a query that doesn't have lean or select methods
+      mockUserModel.findByIdAndUpdate.mockResolvedValueOnce(updatedUser);
+      
+      const result = await userService.updateFCMToken(userId, fcmToken);
+      
+      expect(result).toEqual(updatedUser);
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        userId,
+        { fcmToken },
+        { new: true }
+      );
+    });
+    
+    test('should preserve User not found error during update', async () => {
+      // Input: Valid user ID but user not found with error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'User not found'
+      
+      const userId = 'not-found-id';
+      const fcmToken = 'token';
+      const userNotFoundError = new Error('User not found');
+      
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(userNotFoundError)
+      });
+      
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('User not found');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', userNotFoundError);
+    });
+    
+    test('should preserve Invalid ID error during update', async () => {
+      // Input: Valid user ID but with Invalid ID error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'Invalid ID'
+      
+      const userId = 'invalid-format-id';
+      const fcmToken = 'token';
+      const invalidIdError = new Error('Invalid ID');
+      
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(invalidIdError)
+      });
+      
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('Invalid ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', invalidIdError);
+    });
+    test('should handle special case for invalid-id in unmocked tests for FCM token', async () => {
+      // Input: 'invalid-id' with JEST_WORKER_ID not set
+      // Expected behavior: Error is thrown with proper message
+      // Expected output: Error with message 'Invalid ID'
+      
+      // Save the original environment variable
+      const originalJestWorkerId = process.env.JEST_WORKER_ID;
+      // Delete the environment variable to simulate unmocked environment
+      delete process.env.JEST_WORKER_ID;
+      
+      // Call the method and expect it to throw
+      await expect(userService.updateFCMToken('invalid-id', 'token'))
+        .rejects.toThrow('Invalid ID');
+      
+      // Restore the environment variable
+      process.env.JEST_WORKER_ID = originalJestWorkerId;
+      
+      expect(mockUserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+    
+    test('should handle query with select method for FCM token update', async () => {
+      // Input: Valid user ID and token with query that has select method
+      // Expected behavior: User is updated using select().lean() chain
+      // Expected output: Updated user object
+      
+      const userId = 'select-id';
+      const fcmToken = 'select-token';
+      const updatedUser = {
+        _id: userId,
+        email: 'select@example.com',
+        displayName: 'Select User',
+        fcmToken
+      };
+      
+      const mockSelect = jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue(updatedUser)
+      });
+      
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        select: mockSelect
+      });
+      
+      const result = await userService.updateFCMToken(userId, fcmToken);
+      
+      expect(result).toEqual(updatedUser);
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        userId,
+        { fcmToken },
+        { new: true }
+      );
+      expect(mockSelect).toHaveBeenCalledWith('*');
+    });
+    
+    test('should handle direct query return for FCM token update', async () => {
+      // Input: Valid user ID and token with query that returns directly
+      // Expected behavior: User is updated directly from query
+      // Expected output: Updated user object
+      
+      const userId = 'direct-id';
+      const fcmToken = 'direct-token';
+      const updatedUser = {
+        _id: userId,
+        email: 'direct@example.com',
+        displayName: 'Direct User',
+        fcmToken
+      };
+      
+      // Mock a query that doesn't have lean or select methods
+      mockUserModel.findByIdAndUpdate.mockResolvedValueOnce(updatedUser);
+      
+      const result = await userService.updateFCMToken(userId, fcmToken);
+      
+      expect(result).toEqual(updatedUser);
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        userId,
+        { fcmToken },
+        { new: true }
+      );
+    });
+    
+    test('should preserve User not found error during update', async () => {
+      // Input: Valid user ID but user not found with error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'User not found'
+      
+      const userId = 'not-found-id';
+      const fcmToken = 'token';
+      const userNotFoundError = new Error('User not found');
+      
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(userNotFoundError)
+      });
+      
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('User not found');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', userNotFoundError);
+    });
+    
+    test('should preserve Invalid ID error during update', async () => {
+      // Input: Valid user ID but with Invalid ID error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'Invalid ID'
+      
+      const userId = 'invalid-format-id';
+      const fcmToken = 'token';
+      const invalidIdError = new Error('Invalid ID');
+      
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(invalidIdError)
+      });
+      
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('Invalid ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', invalidIdError);
+    });
     test('should successfully update FCM token', async () => {
       // Input: Valid user ID and FCM token
       // Expected behavior: User's FCM token is updated
