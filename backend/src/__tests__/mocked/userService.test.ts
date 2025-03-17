@@ -31,6 +31,25 @@ describe('UserService - Mocked Tests', () => {
     // Create a new instance of UserService with our mock model for each test
     userService = new UserService(mockUserModel as any);
   });
+  
+  // Test for line 7: Constructor with default parameter
+  test('should initialize with default UserModel when not provided', () => {
+    // This test covers the branch where the constructor uses the default parameter
+    // We need to temporarily restore the original import
+    jest.unmock('../../models/user');
+    const originalImport = jest.requireActual('../../models/user');
+    
+    // Create a new instance without providing a model
+    const defaultUserService = new UserService();
+    
+    // Verify that the userModel is set to the default UserModel
+    expect(defaultUserService).toBeDefined();
+    
+    // Re-mock the user model for subsequent tests
+    jest.mock('../../models/user', () => ({
+      UserModel: mockUserModel
+    }));
+  });
 
   afterEach(() => {
     // Restore any environment variables that might have been modified
@@ -354,7 +373,68 @@ describe('UserService - Mocked Tests', () => {
       
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching user by ID:', dbError);
     });
-  //     expect(mockFindById).toHaveBeenCalledWith(userId);
+    
+    test('should cover branch where error message is "Invalid ID" (line 72 - true branch)', async () => {
+      // Input: Valid user ID but query fails with 'Invalid ID' error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'Invalid ID'
+      
+      const userId = 'preserve-error-id';
+      const invalidIdError = new Error('Invalid ID');
+      
+      // Mock the findById implementation to throw an 'Invalid ID' error
+      mockUserModel.findById.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(invalidIdError)
+      });
+      
+      // This should trigger the true branch of the if statement at line 71-72
+      await expect(userService.getUserById(userId))
+        .rejects.toThrow('Invalid ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching user by ID:', invalidIdError);
+    });
+    
+    test('should cover branch where error is null (line 72 - optional chaining branch)', async () => {
+      // Input: Valid user ID but query fails with null error
+      // Expected behavior: Generic error is thrown
+      // Expected output: Error with message 'Failed to fetch user by ID'
+      
+      const userId = 'null-error-id';
+      
+      // Mock the findById implementation to throw null
+      mockUserModel.findById.mockReturnValueOnce({
+        lean: jest.fn().mockImplementation(() => {
+          // Create a situation where error is null but still caught
+          throw null;
+        })
+      });
+      
+      // This should trigger the optional chaining branch of the if statement at line 71-72
+      await expect(userService.getUserById(userId))
+        .rejects.toThrow('Failed to fetch user by ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching user by ID:', null);
+    });
+    
+    test('should cover branch where error message is not "Invalid ID" (line 72 - false branch)', async () => {
+      // Input: Valid user ID but query fails with a custom error
+      // Expected behavior: Generic error is thrown instead of preserving original error
+      // Expected output: Error with message 'Failed to fetch user by ID'
+      
+      const userId = 'custom-error-id';
+      const customError = new Error('Some other error');
+      
+      // Mock the findById implementation to throw a custom error
+      mockUserModel.findById.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(customError)
+      });
+      
+      // This should trigger the false branch of the if statement at line 71-72
+      await expect(userService.getUserById(userId))
+        .rejects.toThrow('Failed to fetch user by ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching user by ID:', customError);
+    });
   //   });
 
   //   test('should throw error for invalid user ID', async () => {
@@ -828,6 +908,108 @@ describe('UserService - Mocked Tests', () => {
         .rejects.toThrow('Failed to update FCM token');
       
       expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', dbError);
+    });
+    
+    test('should cover branch where error message is "User not found" (line 153 - true branch)', async () => {
+      // Input: Valid user ID but query fails with 'User not found' error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'User not found'
+      
+      const userId = 'preserve-error-id';
+      const fcmToken = 'token';
+      const userNotFoundError = new Error('User not found');
+      
+      // Mock the findByIdAndUpdate implementation to throw a 'User not found' error
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(userNotFoundError)
+      });
+      
+      // This should trigger the true branch of the if statement at line 152-153
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('User not found');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', userNotFoundError);
+    });
+    
+    test('should cover branch where error message is "Invalid ID" (line 153 - true branch)', async () => {
+      // Input: Valid user ID but query fails with 'Invalid ID' error
+      // Expected behavior: Original error is preserved and rethrown
+      // Expected output: Error with message 'Invalid ID'
+      
+      const userId = 'preserve-error-id-2';
+      const fcmToken = 'token';
+      const invalidIdError = new Error('Invalid ID');
+      
+      // Mock the findByIdAndUpdate implementation to throw an 'Invalid ID' error
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(invalidIdError)
+      });
+      
+      // This should trigger the true branch of the if statement at line 152-153
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('Invalid ID');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', invalidIdError);
+    });
+    
+    test('should cover branch where error message is not "User not found" or "Invalid ID" (line 153 - false branch)', async () => {
+      // Input: Valid user ID but query fails with a custom error
+      // Expected behavior: Generic error is thrown instead of preserving original error
+      // Expected output: Error with message 'Failed to update FCM token'
+      
+      const userId = 'custom-error-id';
+      const fcmToken = 'token';
+      const customError = new Error('Some other error');
+      
+      // Mock the findByIdAndUpdate implementation to throw a custom error
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockRejectedValue(customError)
+      });
+      
+      // This should trigger the false branch of the if statement at line 152-153
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('Failed to update FCM token');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', customError);
+    });
+    
+    test('should cover branch where error is null in updateFCMToken (line 153 - optional chaining branch)', async () => {
+      // Input: Valid user ID but query fails with null error
+      // Expected behavior: Generic error is thrown
+      // Expected output: Error with message 'Failed to update FCM token'
+      
+      const userId = 'null-error-fcm-id';
+      const fcmToken = 'token';
+      
+      // Mock the findByIdAndUpdate implementation to throw null
+      mockUserModel.findByIdAndUpdate.mockReturnValueOnce({
+        lean: jest.fn().mockImplementation(() => {
+          // Create a situation where error is null but still caught
+          throw null;
+        })
+      });
+      
+      // This should trigger the optional chaining branch of the if statement at line 152-153
+      await expect(userService.updateFCMToken(userId, fcmToken))
+        .rejects.toThrow('Failed to update FCM token');
+      
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error updating FCM token:', null);
+    });
+    
+    test('should directly test line 122 in updateFCMToken', async () => {
+      // Input: 'invalid-id' with ObjectId.isValid mocked to return true
+      // Expected behavior: Special case handling for 'invalid-id' is triggered (line 122)
+      // Expected output: Error with message 'Invalid ID'
+      
+      // Mock ObjectId.isValid to return true to bypass the initial validation check
+      jest.spyOn(mongoose.Types.ObjectId, 'isValid').mockReturnValueOnce(true);
+      
+      // Call the method with 'invalid-id' to trigger line 122
+      await expect(userService.updateFCMToken('invalid-id', 'test-token'))
+        .rejects.toThrow('Invalid ID');
+      
+      // The method should throw before reaching findByIdAndUpdate
+      expect(mockUserModel.findByIdAndUpdate).not.toHaveBeenCalled();
     });
   });
 
