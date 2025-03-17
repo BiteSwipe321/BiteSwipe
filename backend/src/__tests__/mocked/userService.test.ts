@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 import { UserService } from '../../services/userService';
 import {mockUserModel} from '../setup';
 
-// MUST KEEP. We need to undo the mock from the setup since we are testing the unmocked version
+// This file tests the actual UserService implementation with mocked dependencies
+// The UserModel is mocked in setup.ts
 jest.unmock('../../services/userService');
 
 // Create a function to mock the lean() method that all query methods should return

@@ -20,7 +20,32 @@ const mockSchemaType = {
 };
 
 jest.mock('mongoose', () => {
+  class ObjectId {
+    private str: string;
+    
+    constructor(str: string) {
+      this.str = str;
+    }
+
+    toString() {
+      return this.str;
+    }
+
+    toJSON() {
+      return this.str;
+    }
+
+    equals(other: any) {
+      return other?.toString() === this.str;
+    }
+
+    static isValid = jest.fn().mockImplementation((str: string) => {
+      return str !== 'invalid-id';
+    });
+  }
+
   return {
+    ...jest.requireActual('mongoose'),
     connect: jest.fn().mockResolvedValue({}),
     model: jest.fn().mockReturnValue({
       findById: jest.fn(),
@@ -33,9 +58,7 @@ jest.mock('mongoose', () => {
       { Types: mockSchemaType }
     ),
     Types: {
-      ObjectId: {
-        isValid: jest.fn().mockReturnValue(true)
-      }
+      ObjectId
     }
   };
 });
@@ -62,6 +85,13 @@ jest.mock('../config/firebase', () => ({
 }));
 
 // ---------------------------------------------------------
+// User Service
+
+interface CustomError extends Error {
+  code?: string;
+}
+
+// ---------------------------------------------------------
 // Restaurant Services
 //
 const mockRestaurantService = {
@@ -79,10 +109,34 @@ jest.mock('../services/restaurantService', () => ({
 //
 const mockUserService = {
   getUserById: jest.fn(),
-  createUser: jest.fn(),
-  getUserByEmail: jest.fn(),
+  createUser: jest.fn().mockImplementation((email, displayName) => {
+    if (email === 'exists@example.com') {
+      const error = new Error('User already exists') as CustomError;
+      return Promise.reject(error);
+    }
+    return Promise.resolve({
+      _id: 'newUserId',
+      email,
+      displayName,
+      sessionHistory: [],
+      restaurantInteractions: []
+    });
+  }),
+  getUserByEmail: jest.fn().mockImplementation((email) => {
+    if (email === 'exists@example.com') {
+      return Promise.resolve({
+        _id: 'existingId',
+        email,
+        displayName: 'Existing User',
+        sessionHistory: [],
+        restaurantInteractions: []
+      });
+    }
+    return Promise.resolve(null);
+  }),
   updateFCMToken: jest.fn()
 };
+
 jest.mock('../services/userService', () => ({
   UserService: jest.fn().mockImplementation(() => mockUserService)
 }));
@@ -103,6 +157,21 @@ const mockSessionManager = {
   getResultForSession: jest.fn(),
   userDoneSwiping: jest.fn(),
   addPendingInvitation: jest.fn(),
+  getUserSessions: jest.fn().mockImplementation((userId) => {
+    if (userId.toString() === 'nonexistentId') {
+      return Promise.reject(new Error('User not found'));
+    }
+    return Promise.resolve([
+      {
+        _id: 'session1',
+        name: 'Test Session 1'
+      },
+      {
+        _id: 'session2',
+        name: 'Test Session 2'
+      }
+    ]);
+  })
 };
 jest.mock('../services/sessionManager', () => ({
   SessionManager: jest.fn().mockImplementation(() => mockSessionManager)

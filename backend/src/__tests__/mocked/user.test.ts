@@ -3,135 +3,8 @@ import request from 'supertest';
 
 import { createApp } from '../../app';
 
-interface CustomError extends Error {
-  code?: string;
-}
-
-// Mock mongoose
-jest.mock('mongoose', () => {
-  class ObjectId {
-    private str: string;
-    
-    constructor(str: string) {
-      this.str = str;
-    }
-
-    toString() {
-      return this.str;
-    }
-
-    toJSON() {
-      return this.str;
-    }
-
-    equals(other: any) {
-      return other?.toString() === this.str;
-    }
-
-    static isValid(str: string) {
-      return str !== 'invalid-id';
-    }
-  }
-
-  return {
-    ...jest.requireActual('mongoose'),
-    Types: {
-      ObjectId
-    }
-  };
-});
-
-// Mock UserModel
-jest.mock('../../models/user', () => {
-  return {
-    UserModel: {
-      findById: jest.fn().mockImplementation((id) => {
-        if (id.toString() === 'nonexistentId') {
-          return {
-            select: () => ({
-              lean: () => Promise.resolve(null)
-            })
-          };
-        }
-        return {
-          select: () => ({
-            lean: () => Promise.resolve({
-              _id: id,
-              email: 'test@example.com',
-              displayName: 'Test User'
-            })
-          })
-        };
-      }),
-      create: jest.fn().mockImplementation((data) => Promise.resolve({
-        _id: 'newUserId',
-        ...data
-      })),
-      findByIdAndUpdate: jest.fn().mockImplementation((id, update) => {
-        if (id.toString() === 'invalid-id') {
-          return Promise.reject(new Error('Invalid ID'));
-        }
-        if (id.toString() === 'nonexistentId') {
-          return Promise.resolve(null);
-        }
-        return Promise.resolve({ ...update, _id: id });
-      })
-    }
-  };
-});
-
-// Mock the userService module
-jest.mock('../../services/userService', () => {
-  return {
-    UserService: jest.fn().mockImplementation(() => ({
-      createUser: jest.fn().mockImplementation((email, displayName) => {
-        if (email === 'exists@example.com') {
-          const error = new Error('User already exists') as CustomError;
-          return Promise.reject(error);
-        }
-        return Promise.resolve({
-          _id: 'newUserId',
-          email,
-          displayName
-        });
-      }),
-      getUserByEmail: jest.fn().mockImplementation((email) => {
-        if (email === 'exists@example.com') {
-          return Promise.resolve({
-            _id: 'existingId',
-            email,
-            displayName: 'Existing User'
-          });
-        }
-        return Promise.resolve(null);
-      })
-    }))
-  };
-});
-
-// Mock the sessionManager module
-jest.mock('../../services/sessionManager', () => {
-  return {
-    SessionManager: jest.fn().mockImplementation(() => ({
-      getUserSessions: jest.fn().mockImplementation((userId) => {
-        if (userId.toString() === 'nonexistentId') {
-          return Promise.reject(new Error('User not found'));
-        }
-        return Promise.resolve([
-          {
-            _id: 'session1',
-            name: 'Test Session 1'
-          },
-          {
-            _id: 'session2',
-            name: 'Test Session 2'
-          }
-        ]);
-      })
-    }))
-  };
-});
-
+// MUST KEEP. We need to undo the mock from the setup since we are testing the unmocked version
+jest.unmock('../../models/user');
 let app: Express;
 
 beforeAll(async () => {
@@ -229,7 +102,9 @@ describe('Unmocked: POST /users', () => {
     expect(response.body).toEqual({
       _id: 'newUserId',
       email: userData.email,
-      displayName: userData.displayName
+      displayName: userData.displayName,
+      sessionHistory: [],
+      restaurantInteractions: []
     });
   });
 
