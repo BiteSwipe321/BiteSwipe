@@ -1,70 +1,97 @@
+import { Model, Types } from 'mongoose';
 import { UserModel } from '../models/user';
-import mongoose, { Types } from 'mongoose';
 
+interface User {
+  email: string;
+  displayName: string;
+  sessionHistory: any[];
+  restaurantInteractions: any[];
+}
 
 export class UserService {
-    async createUser(email: string, displayName: string) {  
-        const existingUser = await this.getUserByEmail(email);
-        
-        if (existingUser) {
-            throw new Error('User already exists');
-        }
+  private userModel: Model<User>;
 
-        try {
-            const user = new UserModel({
-                email,
-                displayName,
-                sessionHistory: [],
-                restaurantInteractions: []
-            });
+  constructor(userModel: Model<User> = UserModel) {
+    this.userModel = userModel;
+  }
 
-            return await user.save();
-        } catch (error) {
-            console.error('Error creating user:', error);
-            throw error;
-        }
+  async createUser(email: string, displayName: string): Promise<User> {
+    if (!email || !displayName) {
+      throw new Error('Email and displayName are required');
     }
 
-    async getUserById(userId: string) {
-        try {
-            if (!Types.ObjectId.isValid(userId)) {
-                throw new Error('Invalid user ID format');
-            }
-            const userObjectId = new Types.ObjectId(userId);
-            return await UserModel.findById(userObjectId)
-                .select('-__v') // Exclude version field
-                .lean(); // Convert to plain JavaScript object
-        } catch (error) {
-            console.error('Error getting user:', error);
-            throw error;
-        }
+    const existingUser = await this.getUserByEmail(email);
+
+    if (existingUser) {
+      throw new Error('User already exists');
     }
 
-    async getUserByEmail(email: string) {
-        try {
-            return await UserModel.findOne({ email });
-        } catch (error) {
-            console.error('Error getting user by email:', error);
-            throw error;
-        }
+    try {
+      const user = await this.userModel.create({
+        email,
+        displayName,
+        sessionHistory: [],
+        restaurantInteractions: []
+      });
+
+      console.log('User created successfully:', user);
+      return user;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw new Error('Failed to create user');
+    }
+  }
+
+  async getUserById(userId: string): Promise<User | null> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID format');
     }
 
-    async updateFCMToken(userId: string, fcmToken: string) {
-        try {
-            if (!Types.ObjectId.isValid(userId)) {
-                throw new Error('Invalid user ID format');
-            }
-            const userObjectId = new Types.ObjectId(userId);
-            const result = await UserModel.findByIdAndUpdate(userObjectId, { fcmToken }, { new: true })
-                .select('-__v')
-                .lean();
-            if (!result) {
-                throw new Error('User not found');
-            }
-            return result;
-        } catch (error) {
-            console.error('Error updating FCM token:', error);
-            throw error;
-        }
+    try {
+      return await this.userModel.findById(userId).lean();
+    } catch (error) {
+      console.error('Error fetching user by ID:', error);
+      throw new Error('Failed to fetch user by ID');
     }
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
+    try {
+      return await this.userModel.findOne({ email }).lean();
+    } catch (error) {
+      console.error('Error fetching user by email:', error);
+      throw new Error('Failed to fetch user by email');
+    }
+  }
+
+  async updateFCMToken(userId: string, fcmToken: string): Promise<User | null> {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new Error('Invalid user ID format');
+    }
+
+    if (!fcmToken) {
+      throw new Error('FCM token is required');
+    }
+
+    try {
+      const updatedUser = await this.userModel.findByIdAndUpdate(
+        userId,
+        { fcmToken },
+        { new: true }
+      ).lean();
+
+      if (!updatedUser) {
+        throw new Error('User not found');
+      }
+
+      return updatedUser;
+    } catch (error) {
+      console.error('Error updating FCM token:', error);
+      throw new Error('Failed to update FCM token');
+    }
+  }
 }

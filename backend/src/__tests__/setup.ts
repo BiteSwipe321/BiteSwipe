@@ -1,10 +1,15 @@
 import { config } from 'dotenv';
 import path from 'path';
+import { Model } from 'mongoose';
 
 // Load test environment variables
 config({ path: path.join(__dirname, 'test.env') });
 
-// Mock mongoose
+
+
+// ---------------------------------------------------------
+// Mongoose
+//
 const mockSchema = {
   add: jest.fn(),
   index: jest.fn()
@@ -26,11 +31,18 @@ jest.mock('mongoose', () => {
     Schema: Object.assign(
       jest.fn().mockImplementation(() => mockSchema),
       { Types: mockSchemaType }
-    )
+    ),
+    Types: {
+      ObjectId: {
+        isValid: jest.fn().mockReturnValue(true)
+      }
+    }
   };
 });
 
-// Mock external services
+// ---------------------------------------------------------
+// Google Maps
+//
 jest.mock('../services/externalAPIs/googleMaps', () => ({
   GooglePlacesService: jest.fn().mockImplementation(() => ({
     searchNearby: jest.fn().mockResolvedValue([]),
@@ -38,6 +50,9 @@ jest.mock('../services/externalAPIs/googleMaps', () => ({
   }))
 }));
 
+// ---------------------------------------------------------
+// Firebase
+//
 jest.mock('../config/firebase', () => ({
   firebaseAdmin: {
     messaging: () => ({
@@ -46,20 +61,35 @@ jest.mock('../config/firebase', () => ({
   }
 }));
 
-// Mock singleton services
+// ---------------------------------------------------------
+// Restaurant Services
+//
 const mockRestaurantService = {
   getRestaurants: jest.fn(),
   getRestaurant: jest.fn(),
   addRestaurants: jest.fn()
 };
 
+jest.mock('../services/restaurantService', () => ({
+  RestaurantService: jest.fn().mockImplementation(() => mockRestaurantService)
+}));
+
+// ---------------------------------------------------------
+// User Services
+//
 const mockUserService = {
   getUserById: jest.fn(),
   createUser: jest.fn(),
   getUserByEmail: jest.fn(),
   updateFCMToken: jest.fn()
 };
+jest.mock('../services/userService', () => ({
+  UserService: jest.fn().mockImplementation(() => mockUserService)
+}));
 
+// ---------------------------------------------------------
+// Session Manager
+//
 const mockSessionManager = {
   createSession: jest.fn(),
   getSession: jest.fn(),
@@ -74,23 +104,37 @@ const mockSessionManager = {
   userDoneSwiping: jest.fn(),
   addPendingInvitation: jest.fn(),
 };
-
-// Create mock implementations
-jest.mock('../services/userService', () => ({
-  UserService: jest.fn().mockImplementation(() => mockUserService)
-}));
-
 jest.mock('../services/sessionManager', () => ({
   SessionManager: jest.fn().mockImplementation(() => mockSessionManager)
 }));
 
-jest.mock('../services/restaurantService', () => ({
-  RestaurantService: jest.fn().mockImplementation(() => mockRestaurantService)
+// ---------------------------------------------------------
+// UserModel 
+//
+const mockUserModel = {
+  findOne: jest.fn(),
+  findById: jest.fn(),
+  findByIdAndUpdate: jest.fn(),
+  create: jest.fn().mockImplementation((data) => {
+    return Promise.resolve({
+      ...data,
+      _id: 'mocked-id'
+    });
+  })
+};
+
+jest.mock('../models/user', () => ({
+  UserModel: mockUserModel
 }));
 
-// Export mocks for use in tests
+
+
+// ---------------------------------------------------------
+// Export mocks
+//
 export {
   mockUserService,
   mockSessionManager,
-  mockRestaurantService
+  mockRestaurantService,
+  mockUserModel
 };
