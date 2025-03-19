@@ -31,6 +31,12 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Install MongoDB Tools
+        run: |
+          # Install MongoDB tools
+          brew tap mongodb/brew
+          brew install mongodb-database-tools mongosh
+
       - name: Setup Azure Cosmos DB for MongoDB
         run: |
           # Create resource group for PR
@@ -56,13 +62,20 @@ jobs:
             exit 1
           fi
 
-          # Get connection string
-          MONGO_CONNECTION_STRING=$(az cosmosdb keys list \
+          # Wait for account to be fully provisioned
+          echo "Waiting for Cosmos DB account to be fully provisioned..."
+          sleep 60
+
+          # Get connection string and add database name
+          BASE_MONGO_CONNECTION_STRING=$(az cosmosdb keys list \
             --resource-group $PR_RG \
             --name $COSMOS_ACCOUNT \
             --type connection-strings \
             --query 'connectionStrings[0].connectionString' \
             --output tsv)
+          
+          # Add database name to connection string
+          MONGO_CONNECTION_STRING="${BASE_MONGO_CONNECTION_STRING}/?retryWrites=true&w=majority&appName=biteswipe_test"
 
           # Extract host and port from connection string
           MONGO_IP=$(echo $MONGO_CONNECTION_STRING | sed -n 's/.*@\(.*\):\([0-9]*\).*/\1/p')
@@ -72,18 +85,18 @@ jobs:
           echo "MONGO_CONNECTION_STRING=$MONGO_CONNECTION_STRING" >> $GITHUB_ENV
 
           # Wait and verify MongoDB with retries
-          max_attempts=5
+          max_attempts=10
           attempt=1
           
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts to connect to MongoDB..."
             
             # Try to connect and initialize
-            if mongosh "$MONGO_CONNECTION_STRING" --eval 'db.stats()' &>/dev/null; then
+            if mongosh "$MONGO_CONNECTION_STRING" --eval 'use biteswipe_test; db.stats();' &>/dev/null; then
               echo "MongoDB is ready! Initializing collections..."
               
-              # Set DB_URI environment variable
-              echo "DB_URI=$MONGO_CONNECTION_STRING" >> $GITHUB_ENV
+              # Set DB_URI environment variable with database name
+              echo "DB_URI=${MONGO_CONNECTION_STRING}/biteswipe_test" >> $GITHUB_ENV
               
               # Initialize collections with error handling
               if mongosh "$MONGO_CONNECTION_STRING" --eval '
@@ -102,6 +115,8 @@ jobs:
                 break
               else
                 echo "Failed to initialize collections"
+                sleep 5
+                continue
               fi
             fi
             
@@ -110,8 +125,8 @@ jobs:
               exit 1
             fi
             
-            echo "MongoDB not ready. Waiting 10 seconds before retry..."
-            sleep 10
+            echo "MongoDB not ready. Waiting 20 seconds before retry..."
+            sleep 20
             attempt=$((attempt + 1))
           done
           
@@ -139,7 +154,7 @@ jobs:
           cd backend
           # Create .env file for tests
           echo "PORT=3000" > .env
-          echo "DB_URI=$MONGO_CONNECTION_STRING" >> .env
+          echo "DB_URI=${MONGO_CONNECTION_STRING}/biteswipe_test" >> .env
           echo "NODE_ENV=test" >> .env
           echo "TEST_TYPE=unmocked" >> .env
           echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
