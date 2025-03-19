@@ -1,8 +1,7 @@
-import './mocked_setup'
+import './unittest_setup';
 
 import mongoose from 'mongoose';
 import { UserService } from '../../services/userService';
-import { mockUserModel } from '../../../TEMP/setup';
 
 // This file tests the actual UserService implementation with mocked dependencies
 // The UserModel is mocked in setup.ts

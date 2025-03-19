@@ -1,4 +1,4 @@
-import './mocked_setup'
+import './unittest_setup';
 
 import axios from 'axios';
 import { GooglePlacesService, GooglePlaceDetails, GooglePlaceSearchResult } from '../../services/externalAPIs/googleMaps'; // Update with correct path
@@ -11,37 +11,37 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 describe('GooglePlacesService', () => {
   // Store original env
   const originalEnv = process.env;
-  
+
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks();
-    
+
     // Set up environment variables for testing
     process.env = { ...originalEnv, GOOGLE_MAPS_API_KEY: 'test-api-key' };
   });
-  
+
   afterEach(() => {
     // Restore original env after tests
     process.env = originalEnv;
   });
-  
+
   describe('constructor', () => {
     test('should initialize with API key from environment', () => {
       const service = new GooglePlacesService();
       // Using any to access private property for testing
       expect((service as any).apiKey).toBe('test-api-key');
     });
-    
+
     test('should throw error if API key is not provided', () => {
       // Temporarily remove API key
       delete process.env.GOOGLE_MAPS_API_KEY;
-      
+
       expect(() => {
         new GooglePlacesService();
       }).toThrow('Google Maps API key is required');
     });
   });
-  
+
   describe('searchNearby', () => {
     const mockSearchResponse = {
       data: {
@@ -80,13 +80,13 @@ describe('GooglePlacesService', () => {
         ]
       }
     };
-    
+
     test('should fetch and filter nearby restaurants correctly', async () => {
       mockedAxios.get.mockResolvedValueOnce(mockSearchResponse);
-      
+
       const service = new GooglePlacesService();
       const result = await service.searchNearby(37.7749, -122.4194, 1000);
-      
+
       // Check axios was called with correct parameters
       expect(mockedAxios.get).toHaveBeenCalledWith(
         'https://maps.googleapis.com/maps/api/place/nearbysearch/json',
@@ -100,20 +100,20 @@ describe('GooglePlacesService', () => {
           }
         }
       );
-      
+
       // Should return only restaurant, cafe and places where restaurant type comes before lodging
       expect(result).toHaveLength(3);
       expect(result[0].place_id).toBe('place1');
       expect(result[1].place_id).toBe('place2');
       expect(result[2].place_id).toBe('place3');
     });
-    
+
     test('should use provided keyword if specified', async () => {
       mockedAxios.get.mockResolvedValueOnce(mockSearchResponse);
-      
+
       const service = new GooglePlacesService();
       await service.searchNearby(37.7749, -122.4194, 1000, 'italian');
-      
+
       expect(mockedAxios.get).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -123,7 +123,7 @@ describe('GooglePlacesService', () => {
         })
       );
     });
-    
+
     test('should handle places with undefined types', async () => {
       const responseWithUndefinedTypes = {
         data: {
@@ -138,16 +138,16 @@ describe('GooglePlacesService', () => {
           ]
         }
       };
-      
+
       mockedAxios.get.mockResolvedValueOnce(responseWithUndefinedTypes);
-      
+
       const service = new GooglePlacesService();
       const result = await service.searchNearby(37.7749, -122.4194, 1000);
-      
+
       // Should handle places with no types without errors
       expect(result).toHaveLength(0);
     });
-    
+
     test('should throw error when API returns non-OK status', async () => {
       mockedAxios.get.mockResolvedValueOnce({
         data: {
@@ -155,27 +155,27 @@ describe('GooglePlacesService', () => {
           results: []
         }
       });
-      
+
       const service = new GooglePlacesService();
       await expect(service.searchNearby(37.7749, -122.4194, 1000))
         .rejects
         .toThrow('Failed to fetch nearby places');
-        
+
       expect(console.error).toHaveBeenCalled;
     });
-    
+
     test('should throw error when API request fails', async () => {
       mockedAxios.get.mockRejectedValueOnce(new Error('Network error'));
-      
+
       const service = new GooglePlacesService();
       await expect(service.searchNearby(37.7749, -122.4194, 1000))
         .rejects
         .toThrow('Failed to fetch nearby places');
-        
+
       expect(console.error).toHaveBeenCalled;
     });
   });
-  
+
   describe('getPlaceDetails', () => {
     const mockPlaceDetails: GooglePlaceDetails = {
       place_id: 'test-place-id',
@@ -210,7 +210,7 @@ describe('GooglePlacesService', () => {
       ],
       types: ['restaurant', 'food']
     };
-    
+
     test('should fetch place details correctly', async () => {
       mockedAxios.get.mockResolvedValueOnce({
         data: {
@@ -218,10 +218,10 @@ describe('GooglePlacesService', () => {
           result: mockPlaceDetails
         }
       });
-      
+
       const service = new GooglePlacesService();
       const result = await service.getPlaceDetails('test-place-id');
-      
+
       // Check axios was called with correct parameters
       expect(mockedAxios.get).toHaveBeenCalledWith(
         'https://maps.googleapis.com/maps/api/place/details/json',
@@ -233,31 +233,31 @@ describe('GooglePlacesService', () => {
           }
         }
       );
-      
+
       // Should include photo URLs in result
       expect(result?.photos_url).toHaveLength(2);
       expect(result?.photos_url?.[0]).toContain('photo-reference-1');
       expect(result?.name).toBe('Restaurant Name');
     });
-    
+
     test('should handle place details without photos', async () => {
       const placeWithoutPhotos = { ...mockPlaceDetails };
       delete placeWithoutPhotos.photos;
-      
+
       mockedAxios.get.mockResolvedValueOnce({
         data: {
           status: 'OK',
           result: placeWithoutPhotos
         }
       });
-      
+
       const service = new GooglePlacesService();
       const result = await service.getPlaceDetails('test-place-id');
-      
+
       // Should not error when no photos are present
       expect(result?.name).toBe('Restaurant Name');
     });
-    
+
     test('should throw error when API returns non-OK status', async () => {
       mockedAxios.get.mockResolvedValueOnce({
         data: {
@@ -265,33 +265,33 @@ describe('GooglePlacesService', () => {
           result: {}
         }
       });
-      
+
       const service = new GooglePlacesService();
       await expect(service.getPlaceDetails('invalid-id'))
         .rejects
         .toThrow('Failed to fetch place details');
-        
+
       expect(console.error).toHaveBeenCalled;
     });
-    
+
     test('should throw error when API request fails', async () => {
       mockedAxios.get.mockRejectedValueOnce(new Error('Network error'));
-      
+
       const service = new GooglePlacesService();
       await expect(service.getPlaceDetails('test-place-id'))
         .rejects
         .toThrow('Failed to fetch place details');
-        
+
       expect(console.error).toHaveBeenCalled;
     });
   });
-  
+
   describe('getPhotoUrl', () => {
     test('should generate correct photo URL', () => {
       const service = new GooglePlacesService();
       // Using any to access private method for testing
       const photoUrl = (service as any).getPhotoUrl('test-photo-reference', 400);
-      
+
       expect(photoUrl).toBe('https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=test-photo-reference&key=test-api-key');
     });
   });

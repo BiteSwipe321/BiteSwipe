@@ -1,4 +1,4 @@
-import './mocked_setup'
+import './unittest_setup';
 
 import { Request, Response, NextFunction } from 'express';
 import { validateRequest } from '../../middleware/validateRequest';
@@ -6,7 +6,7 @@ import { validationResult, ValidationError } from 'express-validator';
 
 // Create a simplified mock of the Result class from express-validator
 class MockResult {
-  constructor(private readonly errors: ValidationError[] = []) {}
+  constructor(private readonly errors: ValidationError[] = []) { }
 
   isEmpty(): boolean {
     return this.errors.length === 0;
@@ -25,7 +25,7 @@ class MockResult {
     return this;
   }
 
-  throw(): void {}
+  throw(): void { }
 }
 
 // Mock express-validator
@@ -37,11 +37,11 @@ describe('validateRequest Middleware', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
   let mockNext: NextFunction;
-  
+
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Setup mock request, response, and next function
     mockRequest = {};
     mockResponse = {
@@ -50,51 +50,51 @@ describe('validateRequest Middleware', () => {
     };
     mockNext = jest.fn();
   });
-  
+
   test('should call next() when there are no validation errors', () => {
     // Create a mock result with no errors
     const mockResult = new MockResult([]);
-    
+
     // Mock validationResult to return our mock result
     (validationResult as unknown as jest.Mock).mockReturnValue(mockResult);
-    
+
     // Call the middleware
     validateRequest(mockRequest as Request, mockResponse as Response, mockNext);
-    
+
     // Verify next was called
     expect(mockNext).toHaveBeenCalled();
     expect(mockResponse.status).not.toHaveBeenCalled();
     expect(mockResponse.json).not.toHaveBeenCalled();
   });
-  
+
   test('should return 400 status with errors when validation fails', () => {
     // Create mock validation errors that match the ValidationError interface
     const mockErrors: ValidationError[] = [
-      { 
+      {
         type: 'field',
-        msg: 'Invalid email format', 
+        msg: 'Invalid email format',
         path: 'email',
         location: 'body',
         value: 'test'
       },
-      { 
+      {
         type: 'field',
-        msg: 'Password must be at least 6 characters', 
+        msg: 'Password must be at least 6 characters',
         path: 'password',
         location: 'body',
         value: 'test'
       }
     ];
-    
+
     // Create a mock result with errors
     const mockResult = new MockResult(mockErrors);
-    
+
     // Mock validationResult to return our mock result
     (validationResult as unknown as jest.Mock).mockReturnValue(mockResult);
-    
+
     // Call the middleware
     validateRequest(mockRequest as Request, mockResponse as Response, mockNext);
-    
+
     // Verify response
     expect(mockResponse.status).toHaveBeenCalledWith(400);
     expect(mockResponse.json).toHaveBeenCalledWith({ errors: mockErrors });

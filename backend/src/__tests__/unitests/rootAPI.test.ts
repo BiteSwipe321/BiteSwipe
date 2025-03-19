@@ -1,4 +1,4 @@
-import './mocked_setup'
+import './unittest_setup';
 
 import { Express } from 'express';
 import request from 'supertest';
@@ -25,7 +25,7 @@ describe('Mocked: GET /', () => {
 
   test('Root endpoint returns correct structure', async () => {
     const response = await request(app).get('/');
-    
+
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       message: 'Welcome to BiteSwipe API',
@@ -42,7 +42,7 @@ describe('Mocked: GET /', () => {
 
   test('Response headers are correct', async () => {
     const response = await request(app).get('/');
-    
+
     expect(response.headers['content-type']).toMatch(/application\/json/);
   });
 
@@ -57,7 +57,7 @@ describe('Mocked: GET /', () => {
 
     // Second request
     const secondResponse = await request(app).get('/');
-    
+
     // Server time should update
     expect(secondResponse.body.serverTime).toBe(laterDate);
     // But build time should remain the same

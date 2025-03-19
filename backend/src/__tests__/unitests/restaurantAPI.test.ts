@@ -1,6 +1,6 @@
 // Import from setup.ts to use the centralized mocks for other dependencies
 
-import './mocked_setup'
+import './unittest_setup';
 
 import { Types } from "mongoose";
 import request from "supertest";
@@ -226,7 +226,7 @@ describe("Restaurant API Endpoints", () => {
     // Expected output: Error message
 
     // Setup mocks to simulate session not found
-    const error = new Error("Session not found") as Error & { code?: string };
+    const error = new Error("Session not found") as Error & { code?: string; };
     error.code = "SESSION_NOT_FOUND";
     mockSessionManager.getRestaurantsInSession.mockRejectedValue(error);
 

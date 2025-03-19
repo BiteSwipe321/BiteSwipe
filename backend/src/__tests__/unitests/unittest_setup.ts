@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import path from "path";
-import { Model } from "mongoose";
 
 // Load test environment variables
 config({ path: path.join(__dirname, "test.env") });

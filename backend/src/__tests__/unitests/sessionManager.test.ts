@@ -1,4 +1,4 @@
-import './mocked_setup'
+import './unittest_setup';
 
 import { Express } from 'express';
 import request from 'supertest';
@@ -123,7 +123,7 @@ describe('Mocked: GET /sessions/:sessionId', () => {
         active: true,
         restaurants: [],
         matches: []
-      })
+      });
     });
 
     const baseSessionId = '67bd263553651617ebf5c04f';
@@ -136,7 +136,7 @@ describe('Mocked: GET /sessions/:sessionId', () => {
       restaurants: [],
       matches: []
     });
-  })
+  });
 });
 
 describe('Mocked: POST /sessions/:sessionId/invitations', () => {
@@ -150,7 +150,7 @@ describe('Mocked: POST /sessions/:sessionId/invitations', () => {
 
   const mockNotificationService = {
     sendNotification: jest.fn()
-  }
+  };
 
   test('Invite User - Service Error', async () => {
     //email is required error
@@ -195,7 +195,7 @@ describe('Mocked: POST /sessions/:sessionId/invitations', () => {
     const email = 'test@test.com';
     const response = await request(app).post(`/sessions/${baseSessionId}/invitations`).send({ email });
 
-  })
+  });
 
 });
 
@@ -285,7 +285,7 @@ describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
     const response = await request(app).delete(`/sessions/${sessionId}/participants/${userId}`);
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: 'creator cannot leave' });
-  })
+  });
 
   test('Leaving Session - Success', async () => {
     const mockSession = {
@@ -543,7 +543,7 @@ describe('Mocked: get /sessions/:sessionId/result', () => {
     const sessionId = '67bd263553651617ebf5c04f';
 
     const response = await request(app)
-      .get(`/sessions/${sessionId}/result`)
+      .get(`/sessions/${sessionId}/result`);
 
     expect(response.status).toBe(200);
   });

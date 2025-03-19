@@ -1,5 +1,5 @@
 // Import from setup.ts to use the centralized mocks for other dependencies
-import './mocked_setup'
+import './unittest_setup';
 
 import { Types } from 'mongoose';
 

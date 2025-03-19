@@ -1,4 +1,4 @@
-import './mocked_setup';
+import './unittest_setup';
 
 // Mock mongoose first
 const mockObjectId = jest.fn().mockImplementation((id) => id || 'mock-id');

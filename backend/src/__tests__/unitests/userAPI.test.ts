@@ -1,4 +1,4 @@
-import './mocked_setup';
+import './unittest_setup';
 
 import { Express } from 'express';
 import request from 'supertest';
@@ -77,7 +77,7 @@ describe('Mocked: POST /users/:userId/fcm-token - Error Handling', () => {
     const response = await request(app)
       .post('/users/testUserId/fcm-token')
       .send({});
-    
+
     expect(response.status).toBe(400);
     expect(response.body.errors).toContainEqual(
       expect.objectContaining({
@@ -93,7 +93,7 @@ describe('Mocked: POST /users/:userId/fcm-token - Error Handling', () => {
     const response = await request(app)
       .post('/users/server-error/fcm-token')
       .send({ fcmToken: 'new-token' });
-    
+
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: 'Failed to update FCM token' });
   });
@@ -111,7 +111,7 @@ describe('Mocked: POST /users - Error Handling', () => {
     const response = await request(app)
       .post('/users')
       .send(userData);
-    
+
     expect(response.status).toBe(400);
     expect(response.body.errors).toContainEqual(
       expect.objectContaining({
@@ -136,7 +136,7 @@ describe('Mocked: POST /users - Error Handling', () => {
     const response = await request(app)
       .post('/users')
       .send(userData);
-    
+
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: 'Failed to create user' });
   });
