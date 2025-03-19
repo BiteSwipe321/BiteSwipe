@@ -331,39 +331,44 @@ function createUserModelMock() {
   return UserModelMock;
 }
 
-// Restaurant model mock
+/**
+ * Creates a mock for the Restaurant model with all necessary methods and behaviors
+ * @returns A mock Restaurant model with create, findOne, findById, find, and save methods
+ */
 function createRestaurantModelMock() {
-  const mockRestaurant = {
-    // Mock functions
-    findById: jest.fn().mockImplementation(() => {
-      console.log("setup::mocked_Restaurant.findById");
-      return Promise.resolve(null);
-    }),
-    findOne: jest.fn().mockImplementation(() => {
-      console.log("setup::mocked_Restaurant.findOne");
-      return Promise.resolve(null);
-    }),
-    create: jest.fn().mockImplementation(() => {
-      console.log("setup::mocked_Restaurant.create");
-      return Promise.resolve({
-        name: 'Mock Restaurant',
-        location: { address: 'Mock Address' },
-        priceLevel: 2,
-        save: jest.fn().mockResolvedValue({})
-      });
-    }),
-    save: jest.fn().mockImplementation(() => {
-      console.log("setup::mocked_Restaurant.save");
-      return Promise.resolve({});
-    }),
+  // Define the Restaurant constructor function
+  const RestaurantModelMock = function(this: any, data: any) {
+    // Copy all properties from data to this instance
+    Object.assign(this, data);
     
-    // Mock properties for direct access in tests
-    name: 'Mock Restaurant',
-    location: { address: 'Mock Address' },
-    priceLevel: 2
-  };
+    // Add save method to instance
+    this.save = jest.fn().mockResolvedValue(this);
+    
+    // Add toObject method
+    this.toObject = () => {
+      const obj = {...this};
+      delete obj.save;
+      delete obj.toObject;
+      return obj;
+    };
+  } as any;
   
-  return mockRestaurant;
+  // Static methods for the Restaurant model
+  RestaurantModelMock.find = jest.fn().mockResolvedValue([]);
+  
+  RestaurantModelMock.findOne = jest.fn().mockResolvedValue(null);
+  
+  RestaurantModelMock.findById = jest.fn().mockResolvedValue(null);
+  
+  RestaurantModelMock.create = jest.fn().mockImplementation((data) => {
+    if (data.error) {
+      return Promise.reject(new Error("Failed to create restaurant"));
+    }
+    const restaurant = new RestaurantModelMock(data);
+    return Promise.resolve(restaurant);
+  });
+  
+  return RestaurantModelMock;
 }
 
 // GooglePlacesService mock
@@ -616,58 +621,114 @@ const mockSessionManager = {
 // Mock the Restaurant model itself (not just the instance)
 //
 
-// Create a mock for the Restaurant model constructor
-const Restaurant = {
-  find: jest.fn().mockImplementation(() => {
-    console.log("Restaurant.find called");
-    return {
-      exec: jest.fn().mockResolvedValue([mockRestaurantModel])
-    };
-  }),
-  findOne: jest.fn().mockImplementation(() => {
-    console.log("Restaurant.findOne called");
-    return {
-      exec: jest.fn().mockResolvedValue(mockRestaurantModel)
-    };
-  }),
-  findById: jest.fn().mockImplementation(() => {
-    console.log("Restaurant.findById called");
-    return {
-      exec: jest.fn().mockResolvedValue(mockRestaurantModel)
-    };
-  }),
-  create: jest.fn().mockImplementation((data) => {
-    console.log("Restaurant.create called with:", data);
-    return Promise.resolve({
-      ...mockRestaurantModel,
-      ...data
-    });
-  }),
-  updateOne: jest.fn().mockImplementation(() => {
-    console.log("Restaurant.updateOne called");
-    return {
-      exec: jest.fn().mockResolvedValue({ nModified: 1 })
-    };
-  }),
-  deleteOne: jest.fn().mockImplementation(() => {
-    console.log("Restaurant.deleteOne called");
-    return {
-      exec: jest.fn().mockResolvedValue({ deletedCount: 1 })
-    };
-  }),
-  aggregate: jest.fn().mockImplementation(() => {
-    console.log("Restaurant.aggregate called");
-    return {
-      exec: jest.fn().mockResolvedValue([mockRestaurantModel])
-    };
-  })
-};
+// Define a type for the Restaurant mock to satisfy TypeScript
+interface RestaurantMock {
+  // Instance methods
+  save: jest.Mock;
+  toObject: () => Record<string, any>;
+  
+  // Static methods
+  find: jest.Mock;
+  findOne: jest.Mock;
+  findById: jest.Mock;
+  create: jest.Mock;
+  updateOne: jest.Mock;
+  deleteOne: jest.Mock;
+  aggregate: jest.Mock;
+}
+
+interface RestaurantConstructorMock extends jest.Mock {
+  find: jest.Mock;
+  findOne: jest.Mock;
+  findById: jest.Mock;
+  create: jest.Mock;
+  updateOne: jest.Mock;
+  deleteOne: jest.Mock;
+  aggregate: jest.Mock;
+}
+
+// Create a mock for the Restaurant model constructor that supports both static methods and constructor pattern
+const RestaurantConstructor = jest.fn().mockImplementation(function(this: any, data: any) {
+  // Copy all properties from data to this instance
+  Object.assign(this, data);
+  
+  // Add save method to instance
+  this.save = jest.fn().mockResolvedValue(this);
+  
+  // Add toObject method
+  this.toObject = () => {
+    const obj = {...this};
+    delete obj.save;
+    delete obj.toObject;
+    return obj;
+  };
+  
+  return this;
+}) as RestaurantConstructorMock;
+
+// Add static methods to the constructor function
+RestaurantConstructor.find = jest.fn().mockImplementation(() => {
+  console.log("Restaurant.find called");
+  return {
+    exec: jest.fn().mockResolvedValue([mockRestaurantModel])
+  };
+});
+
+RestaurantConstructor.findOne = jest.fn().mockImplementation(() => {
+  console.log("Restaurant.findOne called");
+  return {
+    exec: jest.fn().mockResolvedValue(mockRestaurantModel)
+  };
+});
+
+RestaurantConstructor.findById = jest.fn().mockImplementation(() => {
+  console.log("Restaurant.findById called");
+  return {
+    exec: jest.fn().mockResolvedValue(mockRestaurantModel)
+  };
+});
+
+RestaurantConstructor.create = jest.fn().mockImplementation((data: any) => {
+  console.log("Restaurant.create called with:", data);
+  return Promise.resolve({
+    ...mockRestaurantModel,
+    ...data,
+    save: jest.fn().mockResolvedValue({}),
+    toObject: () => ({ ...data })
+  });
+});
+
+RestaurantConstructor.updateOne = jest.fn().mockImplementation(() => {
+  console.log("Restaurant.updateOne called");
+  return {
+    exec: jest.fn().mockResolvedValue({ nModified: 1 })
+  };
+});
+
+RestaurantConstructor.deleteOne = jest.fn().mockImplementation(() => {
+  console.log("Restaurant.deleteOne called");
+  return {
+    exec: jest.fn().mockResolvedValue({ deletedCount: 1 })
+  };
+});
+
+RestaurantConstructor.aggregate = jest.fn().mockImplementation(() => {
+  console.log("Restaurant.aggregate called");
+  return {
+    exec: jest.fn().mockResolvedValue([mockRestaurantModel])
+  };
+});
+
+const Restaurant = RestaurantConstructor;
 
 // Mock the Restaurant model import
 jest.mock('../../models/restaurant', () => ({
   Restaurant: Restaurant,
   default: Restaurant
 }));
+
+// Remove the global Object mock as it's not needed and causing TypeScript errors
+// The Restaurant constructor is already properly mocked
 
 // ---------------------------------------------------------
 // Export mocks
