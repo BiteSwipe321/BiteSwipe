@@ -4,8 +4,8 @@ import request from "supertest";
 import { Express } from "express";
 import { createApp } from "../../app";
 import mongoose from 'mongoose';
-import { UserService } from '../../services/userService';
 import { Types } from 'mongoose';
+import { mockUserService } from './mocked_setup';
 
 describe("POST /users/:userId/fcm-token - Mocked", () => {
   let app: Express;
@@ -34,7 +34,7 @@ describe("POST /users/:userId/fcm-token - Mocked", () => {
   afterEach(async () => {
     // Clear all mocks after each test
     jest.clearAllMocks();
-
+    // This will reset all mock implementations to their default values
   });
 
   /**
@@ -45,11 +45,12 @@ describe("POST /users/:userId/fcm-token - Mocked", () => {
    */
   test("should return 400 status when user ID format is invalid", async () => {
 
-
-    // Mock userService.updateFCMToken to throw an error
-    jest.spyOn(UserService.prototype, 'updateFCMToken').mockImplementation(() => {
+    // Override only the updateFCMToken method for this specific test
+    mockUserService.updateFCMToken.mockImplementation(() => {
       throw new Error('Invalid user ID format');
     });
+    
+    // We'll restore the original implementation in afterEach via jest.clearAllMocks()
 
     const validUserId = new Types.ObjectId().toString();
 

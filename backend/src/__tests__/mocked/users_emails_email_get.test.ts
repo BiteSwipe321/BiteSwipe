@@ -4,8 +4,7 @@ import request from "supertest";
 import { Express } from "express";
 import { createApp } from "../../app";
 import mongoose from 'mongoose';
-import { UserService } from '../../services/userService';
-import { UserController } from '../../controllers/userController';
+import { mockUserService } from './mocked_setup';
 
 describe("GET /users/emails/:email - Mocked", () => {
   let app: Express;
@@ -41,8 +40,8 @@ describe("GET /users/emails/:email - Mocked", () => {
    * Expected output: 500 status with error message
    */
   test("should return 500 when service throws an error", async () => {
-    // Mock userService.getUserByEmail to throw an error
-    jest.spyOn(UserService.prototype, 'getUserByEmail').mockImplementation(() => {
+    // Override the mockUserService.getUserByEmail to throw an error for this test
+    mockUserService.getUserByEmail.mockImplementation(() => {
       throw new Error('Random error');
     });
 

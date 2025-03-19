@@ -36,13 +36,19 @@ describe('Mocked: POST /sessions', () => {
       .post('/sessions')
       .send(sessionData);
 
-    // The controller is validating the userId format before calling the service
-    // So we're getting a 400 with 'Invalid user ID format' instead of the service error
-    expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: 'Invalid user ID format' });
+    // The service error is propagated to the controller
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'Internal server error' });
 
-    // The service is never called because validation fails first
-    expect(mockSessionManager.createSession).not.toHaveBeenCalled();
+    // Verify the service was called with the correct parameters
+    expect(mockSessionManager.createSession).toHaveBeenCalledWith(
+      'testUserId', 
+      expect.objectContaining({
+        latitude: 49.2827,
+        longitude: -123.1207,
+        radius: 1000
+      })
+    );
   });
 
   test('Create Session - User Id', async () => {
