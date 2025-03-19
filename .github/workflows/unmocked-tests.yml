@@ -37,19 +37,37 @@ jobs:
           PR_RG="pr${{ github.event.pull_request.number }}-mongodb-rg"
           az group create --name $PR_RG --location westus2
 
-          # Deploy MongoDB container instance
+          # Deploy MongoDB container instance with retries
           echo "Deploying MongoDB container..."
-          az container create \
-            --resource-group $PR_RG \
-            --name mongodb \
-            --image mongo:latest \
-            --ports 27017 \
-            --ip-address Public \
-            --os-type Linux \
-            --cpu 1 \
-            --memory 1.5 \
-            --dns-name-label mongodb-${{ github.event.pull_request.number }} \
-            --dns-name-server 8.8.8.8 8.8.4.4
+          max_attempts=3
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts to deploy MongoDB container..."
+            
+            if az container create \
+              --resource-group $PR_RG \
+              --name mongodb \
+              --image mongo:latest \
+              --ports 27017 \
+              --ip-address Public \
+              --os-type Linux \
+              --cpu 1 \
+              --memory 1.5 \
+              --dns-name-label mongodb-${{ github.event.pull_request.number }}; then
+              echo "MongoDB container deployed successfully!"
+              break
+            fi
+            
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Failed to deploy MongoDB container after $max_attempts attempts"
+              exit 1
+            fi
+            
+            echo "Deployment failed. Waiting 10 seconds before retry..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
 
           # Get container IP
           MONGO_IP=$(az container show \
