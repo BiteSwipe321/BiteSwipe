@@ -33,13 +33,6 @@ jobs:
 
       - name: Setup Azure MongoDB Container
         run: |
-          # Get Azure credentials
-          echo "Setting up Azure credentials..."
-          az login --service-principal \
-            -u ${{ secrets.AZURE_CLIENT_ID }} \
-            -p ${{ secrets.AZURE_CLIENT_SECRET }} \
-            --tenant ${{ secrets.AZURE_TENANT_ID }}
-
           # Create resource group for PR
           PR_RG="pr${{ github.event.pull_request.number }}-mongodb-rg"
           az group create --name $PR_RG --location westus2
@@ -52,7 +45,11 @@ jobs:
             --image mongo:latest \
             --ports 27017 \
             --ip-address Public \
-            --os-type Linux
+            --os-type Linux \
+            --cpu 1 \
+            --memory 1.5 \
+            --dns-name-label mongodb-${{ github.event.pull_request.number }} \
+            --dns-name-server 8.8.8.8 8.8.4.4
 
           # Get container IP
           MONGO_IP=$(az container show \
