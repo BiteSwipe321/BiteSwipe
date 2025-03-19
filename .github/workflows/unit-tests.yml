@@ -2,35 +2,39 @@ name: Unit Tests
 
 on:
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/unit-tests.yml'
+    branches:
+      - main
+
+# Define permissions needed for GitHub API operations
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
-  run-unit-tests:
+  unit-tests:
     runs-on: ubuntu-latest
+
     steps:
+      # Checkout the code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      # Set up Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          node-version: "16"
 
+      # Install dependencies
       - name: Install dependencies
-        run: |
-          cd backend
-          npm ci
+        run: cd backend && npm install
 
       - name: Setup Azure CLI
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # Download Firebase credentials
       - name: Download Firebase Credentials
         working-directory: ${{ github.workspace }}
         run: |
@@ -70,7 +74,9 @@ jobs:
           echo "GOOGLE_MAPS_API_KEY=mock_key" >> .env
           echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
 
-      - name: Run unit tests
+      # Run unit tests and generate coverage
+      - name: Run unit tests with coverage
+        id: test_coverage
         run: |
           cd backend
           echo "Running unit tests..."
@@ -79,13 +85,39 @@ jobs:
           # Save test results for reporting
           mkdir -p test-results
           cp coverage/coverage-summary.json test-results/
-          
-          # Display test summary in readable format
-          echo "\n===== Test Coverage Summary ====="
-          echo "Statement coverage: $(cat coverage/coverage-summary.json | jq -r '.total.statements.pct')%"
-          echo "Branch coverage:    $(cat coverage/coverage-summary.json | jq -r '.total.branches.pct')%"
-          echo "Function coverage:  $(cat coverage/coverage-summary.json | jq -r '.total.functions.pct')%"
-          echo "Line coverage:      $(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')%"
-          
-          echo "\n===== Files with Less Than 80% Coverage ====="
-          jq -r 'to_entries | .[] | select(.key != "total") | select(.value.lines.pct < 80) | "\(.key):\n  Lines: \(.value.lines.pct)%\n  Statements: \(.value.statements.pct)%\n  Functions: \(.value.functions.pct)%\n  Branches: \(.value.branches.pct)%"' coverage/coverage-summary.json
+        env:
+          CI: true
+
+      # Display coverage summary in logs
+      - name: Display coverage summary
+        working-directory: ./backend
+        run: |
+          # Display coverage summary in the logs
+          node -e "
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+            
+            // Create summary table header
+            let summaryTable = '| Metric | Coverage | Covered/Total |\\n|--------|----------|---------------|';
+            
+            // Add rows for each metric in a specific order to ensure consistent output
+            const metrics = ['lines', 'statements', 'functions', 'branches', 'branchesTrue'];
+            for (const key of metrics) {
+              if (summary.total[key]) {
+                const value = summary.total[key];
+                summaryTable += '\\n| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |';
+              }
+            }
+            
+            // Print the table to the GitHub Actions log
+            console.log('\\n\\n--- Coverage Summary ---');
+            console.log(summaryTable.replace(/\\\\n/g, '\\n'));
+            console.log('------------------------\\n');
+          "
+
+
+
+      # Fail if tests fail
+      - name: Fail if tests fail
+        if: failure()
+        run: exit 1
