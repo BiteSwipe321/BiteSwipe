@@ -26,6 +26,11 @@ jobs:
           cd backend
           npm ci
 
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       # Download Firebase credentials
       - name: Download Firebase Credentials
         working-directory: ${{ github.workspace }}

@@ -26,6 +26,11 @@ jobs:
           cd backend
           npm ci
 
+      - name: Setup Azure CLI
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Setup Azure MongoDB Container
         run: |
           # Get Azure credentials
@@ -46,7 +51,8 @@ jobs:
             --name mongodb \
             --image mongo:latest \
             --ports 27017 \
-            --ip-address Public
+            --ip-address Public \
+            --os-type Linux
 
           # Get container IP
           MONGO_IP=$(az container show \
