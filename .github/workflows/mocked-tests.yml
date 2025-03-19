@@ -35,16 +35,38 @@ jobs:
       - name: Download Firebase Credentials
         working-directory: ${{ github.workspace }}
         run: |
-          # Download Firebase credentials from Azure Storage
-          az storage blob download \
-            --auth-mode login \
-            --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
-            --container-name secrets \
-            --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-            --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-          
-          # Set proper permissions
-          chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+          # Function to download with retries
+          download_with_retry() {
+            max_attempts=3
+            attempt=1
+            while [ $attempt -le $max_attempts ]; do
+              echo "Attempt $attempt of $max_attempts to download Firebase credentials..."
+              if az storage blob download \
+                --auth-mode login \
+                --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+                --container-name secrets \
+                --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+                --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json; then
+                echo "Download successful!"
+                return 0
+              fi
+              echo "Download failed. Waiting 5 seconds before retry..."
+              sleep 5
+              attempt=$((attempt + 1))
+            done
+            echo "Failed to download after $max_attempts attempts"
+            return 1
+          }
+
+          # Try to download with retries
+          if download_with_retry; then
+            # Set proper permissions
+            chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+            echo "Firebase credentials downloaded and secured successfully"
+          else
+            echo "Failed to download Firebase credentials after all retries"
+            exit 1
+          fi
 
       - name: Setup test environment
         run: |
