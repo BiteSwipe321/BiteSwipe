@@ -1,10 +1,13 @@
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
 import { SessionManager } from '../services/sessionManager';
 import { NotificationService } from '../services/notificationService';
-import { UserModel } from '../models/user';
 import { MongoDocument } from '../models/appTypes';
 import { UserService } from '../services/userService';
+import { ObjectId } from 'mongoose';
+
+interface CodedError extends Error {
+    code?: string;
+}
 
 export class SessionController {
     private sessionManager: SessionManager;
@@ -40,9 +43,9 @@ export class SessionController {
                 return res.status(400).json({ error: 'Invalid session ID format' });
             }
             const sessionId = req.params.sessionId;
-            console.log('Session ID from params:', sessionId);
+            //console.log('Session ID from params:', sessionId);
             
-            const session = await this.sessionManager.getSession(sessionId);
+            const session = await this.sessionManager.getSession(sessionId) as unknown as MongoDocument;
             if(!session) {
                 return res.status(404).json({ error: 'Session not found' });
             }
@@ -104,7 +107,7 @@ export class SessionController {
 
             const session = await this.sessionManager.addPendingInvitation(
                 sessionId,
-                user._id.toString()
+                (user._id as unknown as ObjectId).toString()
             );
 
             // Send notification to invited user
@@ -202,7 +205,7 @@ export class SessionController {
             res.json(restaurants);
         } catch (error) {
             console.error('Error fetching restaurants:', error);
-            if (error instanceof Error && (error as any).code === 'SESSION_NOT_FOUND') {
+            if (error instanceof Error && (error as CodedError).code === 'SESSION_NOT_FOUND') {
                 return res.status(404).json({ error: 'Session not found' });
             }
             res.status(500).json({ error: 'Internal server error' });
@@ -218,9 +221,9 @@ export class SessionController {
 
             res.json({ success: true, session: session._id });
         } catch (error) {
-            console.log(error);
+            console.error(error);
 
-            res.status(500).json({ error: error }); 
+            res.status(500).json({ error }); 
         }
     }
 
@@ -233,7 +236,7 @@ export class SessionController {
 
             res.json({ success: true, session: session._id });
         } catch (error) {
-            console.log(error);
+            console.error(error);
 
             res.status(500).json({ error: error });
         }
@@ -248,7 +251,7 @@ export class SessionController {
 
             res.json({ success: true, session: session._id });
         } catch (error) {
-            console.log(error);
+            console.error(error);
 
             res.status(500).json({ error: error });
         }
@@ -261,7 +264,7 @@ export class SessionController {
             const result = await this.sessionManager.getResultForSession(sessionId);
             res.json({ success: true, result });
         } catch (error) {
-            console.log(error);
+            console.error(error);
 
             res.status(500).json({ error: error });
         }
