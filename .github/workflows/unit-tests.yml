@@ -1,4 +1,4 @@
-name: Run Tests with Coverage
+name: Unit Tests
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  test-and-coverage:
+  unit-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,11 +29,11 @@ jobs:
       - name: Install dependencies
         run: cd backend && npm install
 
-      # Run tests and generate coverage
-      - name: Run tests with coverage
+      # Run unit tests and generate coverage
+      - name: Run unit tests with coverage
         id: test_coverage
         run: |
-          cd backend && npm run test:coverage -- --coverageReporters="json-summary" "text" --no-cache
+          cd backend && npm run test:coverage:unittest -- --coverageReporters="json-summary" "text" --no-cache
         env:
           CI: true
 

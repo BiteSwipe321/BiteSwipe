@@ -1,0 +1,221 @@
+name: Unmocked Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/unmocked-tests.yml'
+
+jobs:
+  run-unmocked-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Setup Azure MongoDB Container
+        run: |
+          # Get Azure credentials
+          echo "Setting up Azure credentials..."
+          az login --service-principal \
+            -u ${{ secrets.AZURE_CLIENT_ID }} \
+            -p ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+
+          # Create resource group for PR
+          PR_RG="pr${{ github.event.pull_request.number }}-mongodb-rg"
+          az group create --name $PR_RG --location westus2
+
+          # Deploy MongoDB container instance
+          echo "Deploying MongoDB container..."
+          az container create \
+            --resource-group $PR_RG \
+            --name mongodb \
+            --image mongo:latest \
+            --ports 27017 \
+            --ip-address Public
+
+          # Get container IP
+          MONGO_IP=$(az container show \
+            --resource-group $PR_RG \
+            --name mongodb \
+            --query ipAddress.ip \
+            --output tsv)
+
+          # Wait for MongoDB to start
+          echo "Waiting for MongoDB to start..."
+          sleep 30
+
+          # Set DB_URI environment variable
+          echo "DB_URI=mongodb://$MONGO_IP:27017/biteswipe" >> $GITHUB_ENV
+
+          # Initialize test database
+          echo "Initializing test database..."
+          mongosh "mongodb://$MONGO_IP:27017/biteswipe_test" --eval '
+            db.createCollection("startup");
+            db.createCollection("users");
+            db.createCollection("restaurants");
+            db.createCollection("matches");
+          '
+
+          # Verify database is ready
+          echo "Verifying database connection:"
+          mongosh "mongodb://$MONGO_IP:27017/biteswipe_test" --eval 'db.stats()'
+
+      - name: Create test setup file
+        run: |
+          cd backend
+          # Backup original setup file
+          cp src/__tests__/unmocked/unmocked_setup.ts src/__tests__/unmocked/unmocked_setup.ts.bak
+          
+          # Create a simplified setup file for PR testing
+          cat > src/__tests__/unmocked/unmocked_setup.ts << 'EOF'
+          import mongoose from "mongoose";
+          import { config } from "dotenv";
+          import path from "path";
+          import { beforeAll, afterAll } from "@jest/globals";
+
+          // Load test environment variables
+          config({ path: path.join(__dirname, "../../../.env") });
+
+          // Set environment variables for test mode
+          process.env.NODE_ENV = 'test';
+          process.env.TEST_TYPE = 'unmocked';
+
+          // Configure mongoose
+          mongoose.set('strictQuery', false);
+
+          // Ensure we're using the test database
+          if (!process.env.DB_URI) {
+            throw new Error('DB_URI environment variable is not set');
+          }
+
+          // Replace the database name with test suffix as per project convention
+          const dbUri = process.env.DB_URI.replace(/\/[^/]+$/, '/biteswipe_test');
+          console.log('Using test database:', dbUri);
+
+          // Connect to MongoDB before tests run
+          beforeAll(async () => {
+            try {
+              await mongoose.connect(dbUri);
+              console.log('Connected to test database:', dbUri);
+              // Update DB_URI with test database URI
+              process.env.DB_URI = dbUri;
+            } catch (error) {
+              console.error('Error connecting to MongoDB:', error);
+              throw error;
+            }
+          });
+
+          // Clean up after tests
+          afterAll(async () => {
+            try {
+              if (mongoose.connection.readyState === 1) {
+                // Only clean up if we're connected to a test database
+                if (mongoose.connection.db.databaseName.endsWith('_test')) {
+                  // Clean up collections instead of dropping the database
+                  const collections = await mongoose.connection.db.collections();
+                  for (const collection of collections) {
+                    if (collection.collectionName !== 'system.indexes') {
+                      await collection.deleteMany({});
+                    }
+                  }
+                }
+                await mongoose.connection.close();
+                console.log('Disconnected from MongoDB');
+              }
+            } catch (error) {
+              console.error('Error cleaning up MongoDB:', error);
+            }
+          });
+          EOF
+
+      - name: Download Firebase Credentials
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Download Firebase credentials from Azure Storage
+          STORAGE_KEY=$(az storage account keys list \
+            --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+            --query '[0].value' -o tsv)
+          
+          # Download Firebase credentials from Azure Storage
+          az storage blob download \
+            --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
+            --account-key "$STORAGE_KEY" \
+            --container-name secrets \
+            --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+            --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+          
+          # Set proper permissions
+          chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+
+      - name: Run unmocked tests
+        run: |
+          cd backend
+          echo "Running unmocked tests..."
+          DB_URI="mongodb://$MONGO_IP:27017/biteswipe_test" npm run test:coverage:unmocked -- --coverageReporters="json-summary" "text" --no-cache --forceExit
+          
+          # Save test results for reporting
+          mkdir -p test-results
+          cp coverage/coverage-summary.json test-results/
+          
+          # Display test summary
+          echo "\n===== Test Summary ====="
+          cat coverage/coverage-summary.json | jq '.total'
+
+      - name: Restore original setup file
+        if: always()
+        run: |
+          cd backend
+          mv src/__tests__/unmocked/unmocked_setup.ts.bak src/__tests__/unmocked/unmocked_setup.ts
+
+      - name: Cleanup Azure Resources
+        if: always()
+        run: |
+          # Delete the resource group and all resources
+          echo "Cleaning up Azure resources..."
+          PR_RG="pr${{ github.event.pull_request.number }}-mongodb-rg"
+          az group delete --name $PR_RG --yes --no-wait
+
+      - name: Create PR comment with test results
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            try {
+              const summary = fs.readFileSync('./backend/coverage/coverage-summary.json', 'utf8');
+              const data = JSON.parse(summary);
+              
+              let message = '## Unmocked Tests Results\n\n';
+              message += '| Category | % Stmts | % Branch | % Funcs | % Lines |\n';
+              message += '|----------|---------|----------|---------|--------|\n';
+              
+              for (const [file, metrics] of Object.entries(data)) {
+                if (file === 'total') {
+                  message += `| Total | ${metrics.statements.pct}% | ${metrics.branches.pct}% | ${metrics.functions.pct}% | ${metrics.lines.pct}% |\n`;
+                }
+              }
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: message
+              });
+            } catch (error) {
+              console.error('Error creating PR comment:', error);
+            }
