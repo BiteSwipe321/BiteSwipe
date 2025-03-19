@@ -46,11 +46,21 @@ jobs:
           # Set proper permissions
           chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
 
+      - name: Setup test environment
+        run: |
+          cd backend
+          # Create .env file for tests
+          echo "PORT=3000" > .env
+          echo "DB_URI=mongodb://mock:27017/biteswipe_test" >> .env
+          echo "NODE_ENV=test" >> .env
+          echo "TEST_TYPE=mocked" >> .env
+          echo "GOOGLE_MAPS_API_KEY=mock_key" >> .env
+
       - name: Run mocked tests
         run: |
           cd backend
           echo "Running mocked tests..."
-          npm run test:coverage:mocked -- --coverageReporters="json-summary" "text" --no-cache --forceExit
+          npm run test:coverage:mocked -- --coverageReporters="json-summary" "text" --no-cache --forceExit --maxWorkers=2
           
           # Save test results for reporting
           mkdir -p test-results
