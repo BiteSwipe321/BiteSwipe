@@ -36,14 +36,9 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           # Download Firebase credentials from Azure Storage
-          STORAGE_KEY=$(az storage account keys list \
-            --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
-            --query '[0].value' -o tsv)
-          
-          # Download Firebase credentials from Azure Storage
           az storage blob download \
+            --auth-mode login \
             --account-name ${{ secrets.AZURE_STORAGE_ACCOUNT }} \
-            --account-key "$STORAGE_KEY" \
             --container-name secrets \
             --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
             --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
