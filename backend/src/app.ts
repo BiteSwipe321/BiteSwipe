@@ -8,10 +8,13 @@ import { RestaurantService } from './services/restaurantService';
 import { validateRequest } from './middleware/validateRequest';
 
 // Wrapper for async handlers to properly catch errors
-const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown> | void) => 
+const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown> | void) =>
   (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch((error: unknown) => {next(error)});
+    Promise.resolve(fn(req, res, next)) // Ensure it always resolves a Promise
+      .then(() => undefined) // Normalize `void` return type
+      .catch((error: unknown) => { next(error); });
   };
+
 
 export function createApp(): Express {
   const app = express();
@@ -60,7 +63,7 @@ export function createApp(): Express {
         app.patch(path, validation, validateRequest, asyncHandler(action));
         break;
       default:
-        console.warn(`Unsupported HTTP method: ${method}`);
+        console.warn(`Unsupported HTTP method: ${method as string}`);
     }
   });
 
