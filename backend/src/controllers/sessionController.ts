@@ -43,15 +43,21 @@ export class SessionController {
                 return res.status(400).json({ error: 'Invalid session ID format' });
             }
             const sessionId = req.params.sessionId;
-            //console.log('Session ID from params:', sessionId);
             
             const session = await this.sessionManager.getSession(sessionId) as unknown as MongoDocument;
             if(!session) {
                 return res.status(404).json({ error: 'Session not found' });
             }
             res.status(200).json(session);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching session:', error);
+            
+            if (error.message === 'Invalid session ID format') {
+                return res.status(400).json({ error: 'Invalid session ID format' });
+            } else if (error.code === 'SESSION_NOT_FOUND') {
+                return res.status(404).json({ error: 'Session not found' });
+            }
+            
             res.status(500).json({ error: 'Internal server error' });
         }
     }
@@ -65,16 +71,27 @@ export class SessionController {
                 radius: string | number 
             };
             
+            // Check for missing required parameters
+            if (latitude === undefined || longitude === undefined || radius === undefined) {
+                return res.status(400).json({ error: 'Missing required location parameters' });
+            }
+            
             // Convert coordinates to numbers
             const lat = typeof latitude === 'string' ? parseFloat(latitude) : latitude;
             const lng = typeof longitude === 'string' ? parseFloat(longitude) : longitude;
             const rad = typeof radius === 'string' ? parseFloat(radius) : radius;
             
-            // Validate userId is a valid ObjectId
-            if (userId.length !== 24) {
-                return res.status(400).json({ error: 'Invalid user ID format' });
+            // Validate coordinates
+            if (isNaN(lat) || lat < -90 || lat > 90) {
+                return res.status(400).json({ error: 'Invalid latitude value' });
             }
-
+            if (isNaN(lng) || lng < -180 || lng > 180) {
+                return res.status(400).json({ error: 'Invalid longitude value' });
+            }
+            if (isNaN(rad) || rad <= 0) {
+                return res.status(400).json({ error: 'Invalid radius value' });
+            }
+            
             const session = await this.sessionManager.createSession(
                 userId,
                 {
@@ -87,6 +104,14 @@ export class SessionController {
             res.status(201).json(session);
         } catch (error) {
             console.error('Error creating session:', error);
+            if (error instanceof Error) {
+                if (error.message === 'Invalid user ID format') {
+                    return res.status(400).json({ error: error.message });
+                }
+                if ((error as any).code === 'USER_NOT_FOUND') {
+                    return res.status(400).json({ error: 'User not found' });
+                }
+            }
             res.status(500).json({ error: 'Internal server error' });
         }
     }

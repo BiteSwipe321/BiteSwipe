@@ -1,7 +1,9 @@
+import './mocked_setup'
+
 import { Express } from 'express';
 import request from 'supertest';
 import { createApp } from '../../app';
-import { mockSessionManager, mockRestaurantService } from '../setup';
+import { mockSessionManager, mockRestaurantService } from '../../../TEMP/setup';
 
 let app: Express;
 
@@ -33,7 +35,7 @@ describe('Mocked: POST /sessions', () => {
     const response = await request(app)
       .post('/sessions')
       .send(sessionData);
-    
+
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: 'Invalid user ID format' });
     // expect(mockSessionManager.createSession).toHaveBeenCalled();
@@ -41,15 +43,15 @@ describe('Mocked: POST /sessions', () => {
 
   test('Create Session - User Id', async () => {
     mockSessionManager.createSession.mockImplementation((userId, location) => {
-      if(!userId || !location) {
+      if (!userId || !location) {
         throw new Error('Invalid input');
       }
-    
-      if(location.latitude === undefined || location.longitude === undefined
+
+      if (location.latitude === undefined || location.longitude === undefined
         || location.radius === undefined) {
         throw new Error('Invalid location');
       }
-    
+
       return Promise.resolve({
         _id: 'mock-session-id-123',
         userId: userId,
@@ -82,7 +84,7 @@ describe('Mocked: POST /sessions', () => {
 describe('Mocked: GET /sessions/:sessionId', () => {
   test('Get Session - Service Error', async () => {
     const mockError = new Error('Service failure');
-    mockSessionManager.getSession.mockRejectedValue(mockError); 
+    mockSessionManager.getSession.mockRejectedValue(mockError);
 
     const baseSessionId = 'mock-session-id-123';
     const response = await request(app).get(`/sessions/${baseSessionId}`);
@@ -92,7 +94,7 @@ describe('Mocked: GET /sessions/:sessionId', () => {
 
   test('Get Session - Service Error', async () => {
     const mockError = new Error('Service failure');
-    mockSessionManager.getSession.mockRejectedValue(mockError); 
+    mockSessionManager.getSession.mockRejectedValue(mockError);
 
     const baseSessionId = '67bd263553651617ebf5c04f';
     const response = await request(app).get(`/sessions/${baseSessionId}`);
@@ -111,7 +113,7 @@ describe('Mocked: GET /sessions/:sessionId', () => {
 
   test('Get Session - Session Found', async () => {
     mockSessionManager.getSession.mockImplementation((sessionId) => {
-      if(!sessionId) {
+      if (!sessionId) {
         throw new Error('Invalid input');
       }
 
@@ -129,10 +131,10 @@ describe('Mocked: GET /sessions/:sessionId', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       _id: 'mock-session-id-123',
-        userId: '67bd263553651617ebf5c04f',
-        active: true,
-        restaurants: [],
-        matches: []
+      userId: '67bd263553651617ebf5c04f',
+      active: true,
+      restaurants: [],
+      matches: []
     });
   })
 });
@@ -150,29 +152,29 @@ describe('Mocked: POST /sessions/:sessionId/invitations', () => {
     sendNotification: jest.fn()
   }
 
-  test('Invite User - Service Error', async() => {
+  test('Invite User - Service Error', async () => {
     //email is required error
     const mockError = new Error('Service failure');
     mockUserFindOne.mockRejectedValue(mockError);
 
-    const baseSessionId = '67bd263553651617ebf5c04f'; 
+    const baseSessionId = '67bd263553651617ebf5c04f';
     const response = await request(app).post(`/sessions/${baseSessionId}/invitations`);
     expect(response.status).toBe(400);
   });
 
-  test('Invite User - Service Error', async() => {
+  test('Invite User - Service Error', async () => {
     //invalid email
     const mockError = new Error('Service failure');
     mockUserFindOne.mockRejectedValue(mockError);
 
-    const baseSessionId = '67bd263553651617ebf5c04f'; 
+    const baseSessionId = '67bd263553651617ebf5c04f';
     const email = 'test@test.com';
-    const response = await request(app).post(`/sessions/${baseSessionId}/invitations`).send({email});
+    const response = await request(app).post(`/sessions/${baseSessionId}/invitations`).send({ email });
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: 'No user found with this email'});
+    expect(response.body).toEqual({ error: 'No user found with this email' });
   });
 
-  test('Imvite User - correct User', async() => {
+  test('Imvite User - correct User', async () => {
     const mockUser = {
       _id: '67bd263553651617ebf5c04f',
       email: 'test@test.com',
@@ -188,40 +190,40 @@ describe('Mocked: POST /sessions/:sessionId/invitations', () => {
       _id: 'mock-session-id',
       pendingInvitations: [mockUser._id]
     });
-    
+
     const baseSessionId = '67bd263553651617ebf5c04f';
     const email = 'test@test.com';
-    const response = await request(app).post(`/sessions/${baseSessionId}/invitations`).send({email});
-    
+    const response = await request(app).post(`/sessions/${baseSessionId}/invitations`).send({ email });
+
   })
 
 });
 
 describe('Mocked: POST /sessions/:sessionId/join', () => {
-  test('Joining Session - Service Error', async() => {
-    const mockError = new Error('Service failure'); 
+  test('Joining Session - Service Error', async () => {
+    const mockError = new Error('Service failure');
     mockSessionManager.joinSession.mockRejectedValue(mockError);
 
     const baseSessionId = '67bd263553651617ebf5c04f';
     const joinCode = 'A2314';
     const userId = '67bd263553651617ebf5c04f';
-    const response = await request(app).post(`/sessions/${baseSessionId}/participants`).send({joinCode, userId});
+    const response = await request(app).post(`/sessions/${baseSessionId}/participants`).send({ joinCode, userId });
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: 'Internal server error' });
   });
 
-  test('Joining Session - not Invited', async() => {
+  test('Joining Session - not Invited', async () => {
     const notInvitedError = new Error('User has not been invited to this session');
     mockSessionManager.joinSession.mockRejectedValue(notInvitedError);
 
     const sessionId = '67bd263553651617ebf5c04f';
     const UserId = '67bd263553651617ebf5c04f';
-    const response = await request(app).post(`/sessions/${sessionId}/participants`).send({userId: UserId});
+    const response = await request(app).post(`/sessions/${sessionId}/participants`).send({ userId: UserId });
     expect(response.status).toBe(403);
     expect(response.body).toEqual({ error: 'User has not been invited to this session' });
   });
 
-  test('Joining Session Success', async() => {
+  test('Joining Session Success', async () => {
     const mockSession = {
       _id: '67bd263553651617ebf5c04f',
       userId: '67bd263553651617ebf5c04f',
@@ -234,16 +236,16 @@ describe('Mocked: POST /sessions/:sessionId/join', () => {
 
     const sessionId = '67bd263553651617ebf5c04f';
     const userId = '67bd263553651617ebf5c04f';
-    const response = await request(app).post(`/sessions/${sessionId}/participants`).send({userId});
+    const response = await request(app).post(`/sessions/${sessionId}/participants`).send({ userId });
     expect(response.status).toBe(200);
     expect(response.body).toEqual(mockSession);
   });
 });
 
 describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
-  test('Leaving Session - Service Error', async() => {
+  test('Leaving Session - Service Error', async () => {
     const mockError = new Error('Service failure');
-    mockSessionManager.leaveSession.mockRejectedValue(mockError); 
+    mockSessionManager.leaveSession.mockRejectedValue(mockError);
 
     const sessionId = '67bd263553651617ebf5c04f';
     const userId = '67bd263553651617ebf5c04f';
@@ -252,7 +254,7 @@ describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
     expect(response.body).toEqual({ error: 'Internal server error' });
   });
 
-  test('Leaving Session - not a participant', async() => {
+  test('Leaving Session - not a participant', async () => {
     const notInvitedError = new Error('not a participant');
     mockSessionManager.leaveSession.mockRejectedValue(notInvitedError);
 
@@ -263,7 +265,7 @@ describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
     expect(response.body).toEqual({ error: 'not a participant' });
   });
 
-  test('Leaving Session - Session not found', async() => {
+  test('Leaving Session - Session not found', async () => {
     const sessionNotFoundError = new Error('Session not found');
     mockSessionManager.leaveSession.mockRejectedValue(sessionNotFoundError);
 
@@ -274,7 +276,7 @@ describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
     expect(response.body).toEqual({ error: 'Session not found' });
   });
 
-  test('Leaving Session - Creator leaving', async() => {
+  test('Leaving Session - Creator leaving', async () => {
     const creatorLeavingError = new Error('creator cannot leave');
     mockSessionManager.leaveSession.mockRejectedValue(creatorLeavingError);
 
@@ -285,7 +287,7 @@ describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
     expect(response.body).toEqual({ error: 'creator cannot leave' });
   })
 
-  test('Leaving Session - Success', async() => {
+  test('Leaving Session - Success', async () => {
     const mockSession = {
       _id: '67bd263553651617ebf5c04f',
       userId: '67bd263553651617ebf5c04f',
@@ -305,9 +307,9 @@ describe('Mocked: DELETE /sessions/:sessionId/participants/:userId', () => {
 });
 
 describe('Mocked: DELETE /sessions/:sessionId/invitations/:userId', () => {
-  test('Reject Invitation - Service Error', async() => {
+  test('Reject Invitation - Service Error', async () => {
     const mockError = new Error('Service failure');
-    mockSessionManager.rejectInvitation.mockRejectedValue(mockError); 
+    mockSessionManager.rejectInvitation.mockRejectedValue(mockError);
 
     const sessionId = '67bd263553651617ebf5c04f';
     const userId = '67bd263553651617ebf5c04f';
@@ -316,7 +318,7 @@ describe('Mocked: DELETE /sessions/:sessionId/invitations/:userId', () => {
     expect(response.body).toEqual({ error: 'Internal server error' });
   });
 
-  test('Reject Invitations - not been invited', async() => {
+  test('Reject Invitations - not been invited', async () => {
     const notInvitedError = new Error('not been invited');
     mockSessionManager.rejectInvitation.mockRejectedValue(notInvitedError);
 
@@ -327,7 +329,7 @@ describe('Mocked: DELETE /sessions/:sessionId/invitations/:userId', () => {
     expect(response.body).toEqual({ error: 'not been invited' });
   });
 
-  test('Reject Invitations - Session not found', async() => {
+  test('Reject Invitations - Session not found', async () => {
     const sessionNotFoundError = new Error('Session not found');
     mockSessionManager.rejectInvitation.mockRejectedValue(sessionNotFoundError);
 
@@ -338,7 +340,7 @@ describe('Mocked: DELETE /sessions/:sessionId/invitations/:userId', () => {
     expect(response.body).toEqual({ error: 'Session not found' });
   });
 
-  test('Reject Invitations - Success', async() => {
+  test('Reject Invitations - Success', async () => {
     const mockSession = {
       _id: '67bd263553651617ebf5c04f',
       userId: '67bd263553651617ebf5c04f',
@@ -358,7 +360,7 @@ describe('Mocked: DELETE /sessions/:sessionId/invitations/:userId', () => {
 });
 
 describe('Mocked: GET /sessions/:sessionId/restaurants', () => {
-  test('Get Restaurants - Service Error', async() => {
+  test('Get Restaurants - Service Error', async () => {
     const mockError = new Error('Service failure');
     mockSessionManager.getRestaurantsInSession.mockRejectedValue(mockError);
 
@@ -368,19 +370,19 @@ describe('Mocked: GET /sessions/:sessionId/restaurants', () => {
     expect(response.body).toEqual({ error: 'Internal server error' });
   });
 
-  test('Get Restaurants - Session Not Found', async() => {
+  test('Get Restaurants - Session Not Found', async () => {
     const sessionNotFoundError = new Error('Session not found');
     (sessionNotFoundError as any).code = 'SESSION_NOT_FOUND';
-  
-  // Configure your mock to reject with this error
+
+    // Configure your mock to reject with this error
     mockSessionManager.getRestaurantsInSession.mockRejectedValue(sessionNotFoundError);
     const sessionId = '67bd263553651617ebf5c04f';
-    
+
     const response = await request(app).get(`/sessions/${sessionId}/restaurants`);
     expect(response.status).toBe(404);
   });
 
-  test('Get Restaurants - Success', async() => {
+  test('Get Restaurants - Success', async () => {
     const mockRestaurants = [
       {
         id: 'mock-restaurant-id-123',
@@ -402,7 +404,7 @@ describe('Mocked: GET /sessions/:sessionId/restaurants', () => {
 });
 
 describe('Mocked: POST /sessions/:sessionId/votes', () => {
-  test('Record Vote - Service Error', async() => {
+  test('Record Vote - Service Error', async () => {
     const mockError = new Error('Service failure');
     mockSessionManager.sessionSwiped.mockRejectedValue(mockError);
 
@@ -418,7 +420,7 @@ describe('Mocked: POST /sessions/:sessionId/votes', () => {
     expect(response.status).toBe(500);
   });
 
-  test('Record Vote - Success', async() => {
+  test('Record Vote - Success', async () => {
     const mockSession = {
       _id: '67bd263553651617ebf5c04f',
       userId: '67bd263553651617ebf5c04f',
@@ -439,14 +441,14 @@ describe('Mocked: POST /sessions/:sessionId/votes', () => {
       .post(`/sessions/${sessionId}/votes`)
       .send(voteData);
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({success: true, session: mockSession._id});
+    expect(response.body).toEqual({ success: true, session: mockSession._id });
   });
 
 });
 
 
 describe('Mocked: POST /sessions/:sessionId/start', () => {
-  test('Start Session - Service Error', async() => {
+  test('Start Session - Service Error', async () => {
     const mockError = new Error('Service failure');
     mockSessionManager.startSession.mockRejectedValue(mockError);
 
@@ -455,11 +457,11 @@ describe('Mocked: POST /sessions/:sessionId/start', () => {
     const time = 1000;
     const response = await request(app)
       .post(`/sessions/${sessionId}/start`)
-      .send({userId, time});
+      .send({ userId, time });
     expect(response.status).toBe(500);
   });
 
-  test('Start Session - Success', async() => {
+  test('Start Session - Success', async () => {
     const mockSession = {
       _id: '67bd263553651617ebf5c04f',
       userId: '67bd263553651617ebf5c04f',
@@ -475,28 +477,28 @@ describe('Mocked: POST /sessions/:sessionId/start', () => {
     const time = 1000;
     const response = await request(app)
       .post(`/sessions/${sessionId}/start`)
-      .send({userId, time});
+      .send({ userId, time });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({success: true, session: mockSession._id});
+    expect(response.body).toEqual({ success: true, session: mockSession._id });
   });
 
 });
 
 describe('Mocked: POST /sessions/:sessionId/doneSwiping', () => {
-  test('Done Swiping - Service Error', async() => {
+  test('Done Swiping - Service Error', async () => {
     const mockError = new Error('Service failure');
     mockSessionManager.userDoneSwiping.mockRejectedValue(mockError);
 
     const sessionId = '67bd263553651617ebf5c04f';
     const userId = '67bd263553651617ebf5c04f';
-    
+
     const response = await request(app)
       .post(`/sessions/${sessionId}/doneSwiping`)
-      .send({userId});
+      .send({ userId });
     expect(response.status).toBe(500);
   });
 
-  test('Start Session - Success', async() => {
+  test('Start Session - Success', async () => {
     const mockSession = {
       _id: '67bd263553651617ebf5c04f',
       userId: '67bd263553651617ebf5c04f',
@@ -509,29 +511,29 @@ describe('Mocked: POST /sessions/:sessionId/doneSwiping', () => {
 
     const sessionId = '67bd263553651617ebf5c04f';
     const userId = '67bd263553651617ebf5c04f';
-   
+
     const response = await request(app)
       .post(`/sessions/${sessionId}/doneSwiping`)
-      .send({userId});
+      .send({ userId });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({success: true, session: mockSession._id});
+    expect(response.body).toEqual({ success: true, session: mockSession._id });
   });
 
 });
 
 describe('Mocked: get /sessions/:sessionId/result', () => {
-  test('Session Result - Service Error', async() => {
+  test('Session Result - Service Error', async () => {
     const mockError = new Error('Service failure');
     mockSessionManager.getResultForSession.mockRejectedValue(mockError);
 
     const sessionId = '67bd263553651617ebf5c04f';
-    
+
     const response = await request(app)
       .get(`/sessions/${sessionId}/result`);
     expect(response.status).toBe(500);
   });
 
-  test('Session Result - Success', async() => {
+  test('Session Result - Success', async () => {
     const mockResult = {
       _id: '67bd263553651617ebf5c04f',
     };
@@ -539,7 +541,7 @@ describe('Mocked: get /sessions/:sessionId/result', () => {
     mockSessionManager.getResultForSession.mockResolvedValue(mockResult);
 
     const sessionId = '67bd263553651617ebf5c04f';
-    
+
     const response = await request(app)
       .get(`/sessions/${sessionId}/result`)
 

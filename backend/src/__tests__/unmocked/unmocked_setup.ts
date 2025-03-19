@@ -1,0 +1,46 @@
+
+import mongoose from "mongoose";
+
+// Configure mongoose
+mongoose.set('strictQuery', false);
+
+// Validate and fix DB_URI
+if (!process.env.DB_URI) {
+    throw new Error("DB_URI environment variable is not set");
+}
+
+// Add mongodb:// prefix if missing
+let dbUri = process.env.DB_URI;
+if (!dbUri.startsWith("mongodb://")) {
+    dbUri = "mongodb://" + dbUri;
+}
+
+// Replace 'mongo' with 'localhost' when running tests locally
+if (dbUri.includes("mongo:")) {
+    dbUri = dbUri.replace("mongo:", "localhost:");
+}
+
+// Parse the MongoDB URI to extract database name
+const uriParts = dbUri.split('/');
+const baseUri = uriParts.slice(0, -1).join('/');
+const dbName = uriParts[uriParts.length - 1]?.replace(/_test.*$/, '') || 'biteswipe';
+
+// Generate a random 5-character hash
+const randomHash = Math.random().toString(36).substring(2, 7);
+
+// Create test database URI with random hash
+const testDbUri = `${baseUri}/${dbName}_test_${randomHash}`;
+
+// Connect to MongoDB using async IIFE
+(async () => {
+    try {
+        await mongoose.connect(testDbUri);
+        console.log('Connected to test database:', testDbUri);
+    } catch (error) {
+        console.error('Error connecting to test database:', error);
+        throw error;
+    }
+})();
+
+// Update DB_URI with test database URI
+process.env.DB_URI = testDbUri;
