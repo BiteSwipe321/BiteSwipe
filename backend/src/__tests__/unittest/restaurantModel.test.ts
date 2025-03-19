@@ -59,15 +59,14 @@ describe('Restaurant Model', () => {
       }
     };
 
-    // When creating a new restaurant, we get the mock instance
-    // In mocked tests, we're testing that the mock works as expected
-    const restaurant = mockRestaurantInstance;
+    // Create a new restaurant using the constructor pattern
+    const restaurant = new Restaurant(restaurantData);
 
-    // Then the restaurant should have the expected mock properties
+    // Then the restaurant should have the expected properties
     expect(restaurant).toBeDefined();
-    // Verify some of the mock properties
-    expect(restaurant.name).toBe('Mock Restaurant');
-    expect(restaurant.location.address).toBe('Mock Address');
+    // Verify that the properties were copied from restaurantData
+    expect(restaurant.name).toBe('Test Restaurant');
+    expect(restaurant.location.address).toBe('123 Test St, City, Country');
     expect(restaurant.priceLevel).toBe(2);
   });
 
