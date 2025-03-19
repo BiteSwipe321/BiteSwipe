@@ -27,7 +27,7 @@ export class UserService {
         restaurantInteractions: []
       });
 
-      console.log('User created successfully:', user);
+      //console.log('User created successfully:', user);
       return user;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -56,20 +56,21 @@ export class UserService {
       }
       
       // Handle different query structures
-      if (query.select && typeof query.select === 'function') {
-        // This is the structure used in unmocked tests
-        return await query.select('*').lean();
-      } else if (query.lean && typeof query.lean === 'function') {
-        // This is the structure used in mocked tests
-        return await query.lean();
-      } else {
-        // Direct return for simple mock objects
-        return await query;
-      }
+      // if (query.select && typeof query.select === 'function') {
+      //   // This is the structure used in unmocked tests
+      //   return await query.select('*').lean();
+      // } else if (query.lean && typeof query.lean === 'function') {
+      //   // This is the structure used in mocked tests
+      //   return await query.lean();
+      // } else {
+      //   // Direct return for simple mock objects
+      //   return await query;
+      // }
+      return await query.select('*').lean();
     } catch (error: any) {
       console.error('Error fetching user by ID:', error);
       // Preserve original error if it exists
-      if (error?.message === 'Invalid ID') {
+      if (error.message === 'Invalid ID') {
         throw error;
       }
       throw new Error('Failed to fetch user by ID');
@@ -96,7 +97,7 @@ export class UserService {
         // Direct return for simple mock objects
         return await query;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching user by email:', error);
       throw new Error('Failed to fetch user by email');
     }
