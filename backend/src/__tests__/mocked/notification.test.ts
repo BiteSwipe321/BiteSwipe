@@ -1,4 +1,4 @@
-import './unmocked_setup';
+import './mocked_setup';
 import { NotificationService } from '../../services/notificationService';
 import { Types } from 'mongoose';
 import { getMessaging } from '../../config/firebase';
