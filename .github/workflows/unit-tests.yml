@@ -84,45 +84,7 @@ jobs:
             console.log('------------------------\\n');
           "
 
-      # Comment on PR if tests pass
-      - name: Comment on PR if tests pass
-        if: success()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            if (pr) {
-              const runId = context.runId;
-              const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-              
-              const comment = "✅ **Tests passed!** [View coverage report in workflow logs](" + workflowUrl + ")";
-              
-              await github.rest.issues.createComment({
-                ...context.repo,
-                issue_number: pr.number,
-                body: comment
-              });
-            }
 
-      # Comment on PR if tests fail
-      - name: Comment on PR if tests fail
-        if: failure()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const pr = context.payload.pull_request;
-            if (pr) {
-              const runId = context.runId;
-              const workflowUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-              
-              const comment = "❌ **Tests failed!** [View error details in workflow logs](" + workflowUrl + ")";
-              
-              await github.rest.issues.createComment({
-                ...context.repo,
-                issue_number: pr.number,
-                body: comment
-              });
-            }
 
       # Fail if tests fail
       - name: Fail if tests fail

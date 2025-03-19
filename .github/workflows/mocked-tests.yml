@@ -60,32 +60,4 @@ jobs:
           echo "\n===== Test Summary ====="
           cat coverage/coverage-summary.json | jq '.total'
 
-      - name: Create PR comment with test results
-        if: always()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            try {
-              const summary = fs.readFileSync('./backend/coverage/coverage-summary.json', 'utf8');
-              const data = JSON.parse(summary);
-              
-              let message = '## Mocked Tests Results\n\n';
-              message += '| Category | % Stmts | % Branch | % Funcs | % Lines |\n';
-              message += '|----------|---------|----------|---------|--------|\n';
-              
-              for (const [file, metrics] of Object.entries(data)) {
-                if (file === 'total') {
-                  message += `| Total | ${metrics.statements.pct}% | ${metrics.branches.pct}% | ${metrics.functions.pct}% | ${metrics.lines.pct}% |\n`;
-                }
-              }
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: message
-              });
-            } catch (error) {
-              console.error('Error creating PR comment:', error);
-            }
+
