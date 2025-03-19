@@ -103,8 +103,11 @@ jobs:
           mkdir -p test-results
           cp coverage/coverage-summary.json test-results/
           
-          # Display test summary
-          echo "\n===== Test Summary ====="
-          cat coverage/coverage-summary.json | jq '.total'
+          # Display test summary in readable format
+          echo "\n===== Test Coverage Summary ====="
+          echo "Statement coverage: $(cat coverage/coverage-summary.json | jq -r '.total.statements.pct')%"
+          echo "Branch coverage:    $(cat coverage/coverage-summary.json | jq -r '.total.branches.pct')%"
+          echo "Function coverage:  $(cat coverage/coverage-summary.json | jq -r '.total.functions.pct')%"
+          echo "Line coverage:      $(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')%"
 
 
