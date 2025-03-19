@@ -31,70 +31,107 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Setup Azure MongoDB Container
+      - name: Setup Azure Cosmos DB for MongoDB
         run: |
           # Create resource group for PR
           PR_RG="pr${{ github.event.pull_request.number }}-mongodb-rg"
           az group create --name $PR_RG --location westus2
 
-          # Deploy MongoDB container instance with retries
-          echo "Deploying MongoDB container..."
-          max_attempts=3
+          # Generate unique name for Cosmos DB account
+          COSMOS_ACCOUNT="biteswipe-test-${{ github.event.pull_request.number }}"
+          
+          echo "Creating Azure Cosmos DB account..."
+          if az cosmosdb create \
+            --resource-group $PR_RG \
+            --name $COSMOS_ACCOUNT \
+            --kind MongoDB \
+            --capabilities EnableMongo \
+            --server-version 4.2 \
+            --default-consistency-level Strong \
+            --enable-free-tier true \
+            --locations regionName=westus2; then
+            echo "Cosmos DB account created successfully!"
+          else
+            echo "Failed to create Cosmos DB account"
+            exit 1
+          fi
+
+          # Get connection string
+          MONGO_CONNECTION_STRING=$(az cosmosdb keys list \
+            --resource-group $PR_RG \
+            --name $COSMOS_ACCOUNT \
+            --type connection-strings \
+            --query 'connectionStrings[0].connectionString' \
+            --output tsv)
+
+          # Extract host and port from connection string
+          MONGO_IP=$(echo $MONGO_CONNECTION_STRING | sed -n 's/.*@\(.*\):\([0-9]*\).*/\1/p')
+          MONGO_PORT=$(echo $MONGO_CONNECTION_STRING | sed -n 's/.*@\(.*\):\([0-9]*\).*/\2/p')
+
+          # Export connection info
+          echo "MONGO_CONNECTION_STRING=$MONGO_CONNECTION_STRING" >> $GITHUB_ENV
+
+          # Wait and verify MongoDB with retries
+          max_attempts=5
           attempt=1
           
           while [ $attempt -le $max_attempts ]; do
-            echo "Attempt $attempt of $max_attempts to deploy MongoDB container..."
+            echo "Attempt $attempt of $max_attempts to connect to MongoDB..."
             
-            if az container create \
-              --resource-group $PR_RG \
-              --name mongodb \
-              --image mongo:latest \
-              --ports 27017 \
-              --ip-address Public \
-              --os-type Linux \
-              --cpu 1 \
-              --memory 1.5 \
-              --dns-name-label mongodb-${{ github.event.pull_request.number }}; then
-              echo "MongoDB container deployed successfully!"
-              break
+            # Try to connect and initialize
+            if mongosh "$MONGO_CONNECTION_STRING" --eval 'db.stats()' &>/dev/null; then
+              echo "MongoDB is ready! Initializing collections..."
+              
+              # Set DB_URI environment variable
+              echo "DB_URI=$MONGO_CONNECTION_STRING" >> $GITHUB_ENV
+              
+              # Initialize collections with error handling
+              if mongosh "$MONGO_CONNECTION_STRING" --eval '
+                try {
+                  db.createCollection("startup");
+                  db.createCollection("users");
+                  db.createCollection("restaurants");
+                  db.createCollection("matches");
+                  print("All collections created successfully");
+                } catch (e) {
+                  print("Error creating collections: " + e);
+                  quit(1);
+                }
+              '; then
+                echo "Database initialized successfully!"
+                break
+              else
+                echo "Failed to initialize collections"
+              fi
             fi
             
             if [ $attempt -eq $max_attempts ]; then
-              echo "Failed to deploy MongoDB container after $max_attempts attempts"
+              echo "Failed to connect to MongoDB after $max_attempts attempts"
               exit 1
             fi
             
-            echo "Deployment failed. Waiting 10 seconds before retry..."
+            echo "MongoDB not ready. Waiting 10 seconds before retry..."
             sleep 10
             attempt=$((attempt + 1))
           done
-
-          # Get container IP
-          MONGO_IP=$(az container show \
-            --resource-group $PR_RG \
-            --name mongodb \
-            --query ipAddress.ip \
-            --output tsv)
-
-          # Wait for MongoDB to start
-          echo "Waiting for MongoDB to start..."
-          sleep 30
-
-          # Set DB_URI environment variable
-          echo "DB_URI=mongodb://$MONGO_IP:27017/biteswipe" >> $GITHUB_ENV
-
-          # Initialize test database
-          echo "Initializing test database..."
-          mongosh "mongodb://$MONGO_IP:27017/biteswipe_test" --eval '
-            db.createCollection("startup");
-            db.createCollection("users");
-            db.createCollection("restaurants");
-            db.createCollection("matches");
+          
+          # Final verification
+          echo "\nVerifying database state:"
+          mongosh "$MONGO_CONNECTION_STRING" --eval '
+            const stats = db.stats();
+            const collections = db.getCollectionNames();
+            print("\nDatabase stats:");
+            print(JSON.stringify(stats, null, 2));
+            print("\nCollections:");
+            print(JSON.stringify(collections, null, 2));
           '
 
-          # Verify database is ready
-          echo "Verifying database connection:"
-          mongosh "mongodb://$MONGO_IP:27017/biteswipe_test" --eval 'db.stats()'
+      # Cleanup Azure resources
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up Azure resources..."
+          az group delete --name $PR_RG --yes --no-wait || true
 
       # Setup test environment
       - name: Setup test environment
@@ -102,7 +139,7 @@ jobs:
           cd backend
           # Create .env file for tests
           echo "PORT=3000" > .env
-          echo "DB_URI=mongodb://$MONGO_IP:27017/biteswipe_test" >> .env
+          echo "DB_URI=$MONGO_CONNECTION_STRING" >> .env
           echo "NODE_ENV=test" >> .env
           echo "TEST_TYPE=unmocked" >> .env
           echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
@@ -135,7 +172,8 @@ jobs:
             exit 1
           fi
 
-      - name: Run unmocked tests
+      - name: Run unmocked tests with coverage
+        id: test_coverage
         run: |
           cd backend
           echo "Running unmocked tests..."
@@ -144,16 +182,47 @@ jobs:
           # Save test results for reporting
           mkdir -p test-results
           cp coverage/coverage-summary.json test-results/
-          
-          # Display test summary in readable format
-          echo "\n===== Test Coverage Summary ====="
-          echo "Statement coverage: $(cat coverage/coverage-summary.json | jq -r '.total.statements.pct')%"
-          echo "Branch coverage:    $(cat coverage/coverage-summary.json | jq -r '.total.branches.pct')%"
-          echo "Function coverage:  $(cat coverage/coverage-summary.json | jq -r '.total.functions.pct')%"
-          echo "Line coverage:      $(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')%"
-          
-          echo "\n===== Files with Less Than 80% Coverage ====="
-          jq -r 'to_entries | .[] | select(.key != "total") | select(.value.lines.pct < 80) | "\(.key):\n  Lines: \(.value.lines.pct)%\n  Statements: \(.value.statements.pct)%\n  Functions: \(.value.functions.pct)%\n  Branches: \(.value.branches.pct)%"' coverage/coverage-summary.json
+        env:
+          CI: true
+
+      # Display coverage summary in logs
+      - name: Display coverage summary
+        working-directory: ./backend
+        run: |
+          # Display coverage summary in the logs
+          node -e "
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+            
+            // Create summary table header
+            let summaryTable = '| Metric | Coverage | Covered/Total |\n|--------|----------|---------------|';
+            
+            // Add rows for each metric in a specific order to ensure consistent output
+            const metrics = ['lines', 'statements', 'functions', 'branches', 'branchesTrue'];
+            for (const key of metrics) {
+              if (summary.total[key]) {
+                const value = summary.total[key];
+                summaryTable += '\n| ' + key + ' | ' + value.pct + '% | ' + value.covered + '/' + value.total + ' |';
+              }
+            }
+            
+            // Print the table to the GitHub Actions log
+            console.log('\n\n--- Coverage Summary ---');
+            console.log(summaryTable.replace(/\\n/g, '\n'));
+            console.log('------------------------\n');
+            
+            // Print files with less than 80% coverage
+            console.log('\n--- Files with Less Than 80% Coverage ---');
+            Object.entries(summary)
+              .filter(([key, value]) => key !== 'total' && value.lines.pct < 80)
+              .forEach(([file, coverage]) => {
+                console.log(`\n${file}:`);
+                console.log(`  Lines: ${coverage.lines.pct}% (${coverage.lines.covered}/${coverage.lines.total})`);
+                console.log(`  Statements: ${coverage.statements.pct}% (${coverage.statements.covered}/${coverage.statements.total})`);
+                console.log(`  Functions: ${coverage.functions.pct}% (${coverage.functions.covered}/${coverage.functions.total})`);
+                console.log(`  Branches: ${coverage.branches.pct}% (${coverage.branches.covered}/${coverage.branches.total})`);
+              });
+          "
 
       - name: Restore original setup file
         if: always()
