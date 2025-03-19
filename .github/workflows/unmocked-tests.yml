@@ -78,73 +78,17 @@ jobs:
           echo "Verifying database connection:"
           mongosh "mongodb://$MONGO_IP:27017/biteswipe_test" --eval 'db.stats()'
 
-      - name: Create test setup file
+      # Setup test environment
+      - name: Setup test environment
         run: |
           cd backend
-          # Backup original setup file
-          cp src/__tests__/unmocked/unmocked_setup.ts src/__tests__/unmocked/unmocked_setup.ts.bak
-          
-          # Create a simplified setup file for PR testing
-          cat > src/__tests__/unmocked/unmocked_setup.ts << 'EOF'
-          import mongoose from "mongoose";
-          import { config } from "dotenv";
-          import path from "path";
-          import { beforeAll, afterAll } from "@jest/globals";
-
-          // Load test environment variables
-          config({ path: path.join(__dirname, "../../../.env") });
-
-          // Set environment variables for test mode
-          process.env.NODE_ENV = 'test';
-          process.env.TEST_TYPE = 'unmocked';
-
-          // Configure mongoose
-          mongoose.set('strictQuery', false);
-
-          // Ensure we're using the test database
-          if (!process.env.DB_URI) {
-            throw new Error('DB_URI environment variable is not set');
-          }
-
-          // Replace the database name with test suffix as per project convention
-          const dbUri = process.env.DB_URI.replace(/\/[^/]+$/, '/biteswipe_test');
-          console.log('Using test database:', dbUri);
-
-          // Connect to MongoDB before tests run
-          beforeAll(async () => {
-            try {
-              await mongoose.connect(dbUri);
-              console.log('Connected to test database:', dbUri);
-              // Update DB_URI with test database URI
-              process.env.DB_URI = dbUri;
-            } catch (error) {
-              console.error('Error connecting to MongoDB:', error);
-              throw error;
-            }
-          });
-
-          // Clean up after tests
-          afterAll(async () => {
-            try {
-              if (mongoose.connection.readyState === 1) {
-                // Only clean up if we're connected to a test database
-                if (mongoose.connection.db.databaseName.endsWith('_test')) {
-                  // Clean up collections instead of dropping the database
-                  const collections = await mongoose.connection.db.collections();
-                  for (const collection of collections) {
-                    if (collection.collectionName !== 'system.indexes') {
-                      await collection.deleteMany({});
-                    }
-                  }
-                }
-                await mongoose.connection.close();
-                console.log('Disconnected from MongoDB');
-              }
-            } catch (error) {
-              console.error('Error cleaning up MongoDB:', error);
-            }
-          });
-          EOF
+          # Create .env file for tests
+          echo "PORT=3000" > .env
+          echo "DB_URI=mongodb://$MONGO_IP:27017/biteswipe_test" >> .env
+          echo "NODE_ENV=test" >> .env
+          echo "TEST_TYPE=unmocked" >> .env
+          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
+          echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
 
       - name: Download Firebase Credentials
         working-directory: ${{ github.workspace }}
@@ -177,7 +121,7 @@ jobs:
         run: |
           cd backend
           echo "Running unmocked tests..."
-          DB_URI="mongodb://$MONGO_IP:27017/biteswipe_test" npm run test:coverage:unmocked -- --coverageReporters="json-summary" "text" --no-cache --forceExit
+          npm run test:coverage:unmocked -- --coverageReporters="json-summary" "text" --no-cache --forceExit --maxWorkers=2
           
           # Save test results for reporting
           mkdir -p test-results
