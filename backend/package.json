@@ -11,11 +11,11 @@
     "test": "jest --detectOpenHandles",
     "test:mocked": "jest --detectOpenHandles --testPathPattern=src/__tests__/mocked",
     "test:unmocked": "jest --detectOpenHandles --testPathPattern=src/__tests__/unmocked",
-    "test:unittest": "jest --detectOpenHandles --testPathPattern=src/__tests__/unitests",
+    "test:unittest": "jest --detectOpenHandles --testPathPattern=src/__tests__/unittest",
     "test:coverage": "jest --detectOpenHandles --coverage",
     "test:coverage:mocked": "jest --detectOpenHandles --coverage --testPathPattern=src/__tests__/mocked",
     "test:coverage:unmocked": "jest --detectOpenHandles --coverage --testPathPattern=src/__tests__/unmocked",
-    "test:coverage:unittest": "jest --detectOpenHandles --coverage --testPathPattern=src/__tests__/unitests"
+    "test:coverage:unittest": "jest --detectOpenHandles --coverage --testPathPattern=src/__tests__/unittest"
   },
   "dependencies": {
     "@types/mongoose": "^5.11.97",
