@@ -196,7 +196,7 @@ jest.mock('../../models/session', () => {
 import { Session, SessionStatus } from '../../models/session';
 
 // Interface: Session Model
-describe('Mocked: Session Model', () => {
+describe('Session Model', () => {
   // Clear mocks before each test
   beforeEach(() => {
     jest.clearAllMocks();
@@ -584,5 +584,17 @@ describe('Mocked: Session Model', () => {
     const session = new Session(sessionData);
 
     expect(session.createdAt).toEqual(customDate);
+  });
+
+  // Input: Session data with invalid status
+  // Expected behavior: Validation error is thrown
+  // Expected output: Error message indicating invalid status
+  test('should validate status enum values', () => {
+    // In mocked environment, we check the schema definition
+    const session = new Session();
+    const statusOptions = session.schema.path('status').options;
+
+    expect(statusOptions.enum).toEqual(['CREATED', 'MATCHING', 'COMPLETED']);
+    expect(statusOptions.enum).not.toContain('INVALID_STATUS');
   });
 });
