@@ -46,13 +46,13 @@ jobs:
               # Create directory if it doesn't exist
               mkdir -p backend
 
-              # Try to download using Azure CLI
+              # Try to download using Azure CLI with key authentication
               if az storage blob download \
                 --account-name productionstorageaccoun2 \
-                --container-name secrets \
+                --container-name production-container \
                 --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
                 --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-                --auth-mode login 2>/dev/null; then
+                --auth-mode key 2>/dev/null; then
                 # Verify the file exists and is not empty
                 if [ -s backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
                   echo "Download successful and file is valid!"
