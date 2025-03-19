@@ -1,71 +1,17 @@
 import 'dotenv/config';
 import mongoose, { Mongoose } from 'mongoose';
 import { createApp } from './app';
-import express from 'express';
-import morgan from 'morgan';
-import path from 'path';
-import { RestaurantService } from './services/restaurantService';
-import { UserService } from './services/userService';
-import { SessionManager } from './services/sessionManager';
-import { userRoutes } from './routes/userRoutes';
-import { sessionRoutes } from './routes/sessionRoutes';
-import { validateRequest } from './middleware/validateRequest';
+//import path from 'path';
 
 // Configure mongoose
 mongoose.set('strictQuery', true);
 
-const app = express();
-
-// Use Morgan for request logging
-app.use(morgan(':method :url :status :response-time ms - :res[content-length]'));
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Initialize services
-const restaurantService = new RestaurantService();
-const userService = new UserService();
-const sessionManager = new SessionManager(restaurantService);
-
-// Store build timestamp - this will be fixed at deployment time
-const buildTimestamp = new Date().toISOString();
-
-// Register routes
-const routes = [
-    ...userRoutes(userService, sessionManager),
-    ...sessionRoutes(sessionManager, userService)
-];
-
-// Register routes with validation
-routes.forEach(route => {
-    const { method, route: path, action, validation } = route;
-    console.log(`Registering route: ${method.toUpperCase()} ${path}`);
-    app[method as keyof typeof app](path, validation, validateRequest, action);
-});
-
-// Add default route
-app.get('/', (req, res) => {
-    res.status(200).json({ 
-        message: 'Welcome to BiteSwipe API', 
-        serverTime: new Date().toISOString(),
-        buildTime: buildTimestamp,
-        version: '1.0.0',
-        status: 'online',
-        documentation: '/api/docs'
-    });
-});
-
-// Add health check endpoint for Docker
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy' });
-});
-
-const port = process.env.PORT || 3000;
-const dbUrl = process.env.DB_URI || 'mongodb://localhost:27017/biteswipe';
+const port = process.env.PORT ?? 3000;
+const dbUrl = process.env.DB_URI ?? 'mongodb://localhost:27017/biteswipe';
 
 // Define SSL certificate paths
-const sslCertPath = process.env.SSL_CERT_PATH || path.join(__dirname, '..', '..', 'cert.pem');
-const sslKeyPath = process.env.SSL_KEY_PATH || path.join(__dirname, '..', '..', 'key.pem');
+//const sslCertPath = process.env.SSL_CERT_PATH ?? path.join(__dirname, '..', '..', 'cert.pem');
+//const sslKeyPath = process.env.SSL_KEY_PATH ?? path.join(__dirname, '..', '..', 'key.pem');
 
 // Basic startup info
 console.log('\n=== Server Configuration ===');
@@ -98,7 +44,7 @@ typedMongoose.connect(dbUrl, {
         console.log('============================\n');
 
     // Create and start HTTP server
-    const app = await createApp();
+    const app = createApp();
     app.listen(port, () => {
         console.log(`\n=== Server Started ===`);
         console.log(`Server is running on http://localhost:${port}`);

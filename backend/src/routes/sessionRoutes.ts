@@ -59,8 +59,8 @@ export const sessionRoutes = (sessionManager: SessionManager, userService: UserS
             route: '/sessions/:sessionId/participants/:userId',
             action: (req: express.Request, res: express.Response) => sessionController.leaveSession(req, res),
             validation: [
-                param('sessionId').notEmpty().withMessage('Session ID is required'),
-                param('userId').notEmpty().withMessage('User ID is required')
+                param('userId').notEmpty().withMessage('User ID is required'),
+                param('sessionId').notEmpty().withMessage('Session ID is required')
             ]
         },
         {
