@@ -1,3 +1,4 @@
+import './unmocked_setup';
 import mongoose from 'mongoose';
 import { Session, SessionStatus, ISession } from '../../models/session';
 

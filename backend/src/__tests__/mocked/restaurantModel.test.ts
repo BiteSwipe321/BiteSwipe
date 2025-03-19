@@ -1,3 +1,5 @@
+import './mocked_setup';
+
 import mongoose from 'mongoose';
 
 // Mock the Restaurant import first

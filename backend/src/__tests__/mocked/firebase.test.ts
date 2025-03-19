@@ -1,3 +1,4 @@
+import './mocked_setup';
 /**
  * Firebase Configuration Tests
  * 

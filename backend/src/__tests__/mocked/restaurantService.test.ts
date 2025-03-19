@@ -1,3 +1,5 @@
+import './mocked_setup';
+
 import { mockRestaurantService } from '../setup';
 
 // Mock the Restaurant model

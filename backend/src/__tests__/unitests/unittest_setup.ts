@@ -333,7 +333,8 @@ function createUserModelMock() {
 
 // Restaurant model mock
 function createRestaurantModelMock() {
-  return {
+  const mockRestaurant = {
+    // Mock functions
     findById: jest.fn().mockImplementation(() => {
       console.log("setup::mocked_Restaurant.findById");
       return Promise.resolve(null);
@@ -344,13 +345,25 @@ function createRestaurantModelMock() {
     }),
     create: jest.fn().mockImplementation(() => {
       console.log("setup::mocked_Restaurant.create");
-      return Promise.resolve({});
+      return Promise.resolve({
+        name: 'Mock Restaurant',
+        location: { address: 'Mock Address' },
+        priceLevel: 2,
+        save: jest.fn().mockResolvedValue({})
+      });
     }),
     save: jest.fn().mockImplementation(() => {
       console.log("setup::mocked_Restaurant.save");
       return Promise.resolve({});
     }),
+    
+    // Mock properties for direct access in tests
+    name: 'Mock Restaurant',
+    location: { address: 'Mock Address' },
+    priceLevel: 2
   };
+  
+  return mockRestaurant;
 }
 
 // GooglePlacesService mock
@@ -600,6 +613,63 @@ const mockSessionManager = {
 
 
 // ---------------------------------------------------------
+// Mock the Restaurant model itself (not just the instance)
+//
+
+// Create a mock for the Restaurant model constructor
+const Restaurant = {
+  find: jest.fn().mockImplementation(() => {
+    console.log("Restaurant.find called");
+    return {
+      exec: jest.fn().mockResolvedValue([mockRestaurantModel])
+    };
+  }),
+  findOne: jest.fn().mockImplementation(() => {
+    console.log("Restaurant.findOne called");
+    return {
+      exec: jest.fn().mockResolvedValue(mockRestaurantModel)
+    };
+  }),
+  findById: jest.fn().mockImplementation(() => {
+    console.log("Restaurant.findById called");
+    return {
+      exec: jest.fn().mockResolvedValue(mockRestaurantModel)
+    };
+  }),
+  create: jest.fn().mockImplementation((data) => {
+    console.log("Restaurant.create called with:", data);
+    return Promise.resolve({
+      ...mockRestaurantModel,
+      ...data
+    });
+  }),
+  updateOne: jest.fn().mockImplementation(() => {
+    console.log("Restaurant.updateOne called");
+    return {
+      exec: jest.fn().mockResolvedValue({ nModified: 1 })
+    };
+  }),
+  deleteOne: jest.fn().mockImplementation(() => {
+    console.log("Restaurant.deleteOne called");
+    return {
+      exec: jest.fn().mockResolvedValue({ deletedCount: 1 })
+    };
+  }),
+  aggregate: jest.fn().mockImplementation(() => {
+    console.log("Restaurant.aggregate called");
+    return {
+      exec: jest.fn().mockResolvedValue([mockRestaurantModel])
+    };
+  })
+};
+
+// Mock the Restaurant model import
+jest.mock('../../models/restaurant', () => ({
+  Restaurant: Restaurant,
+  default: Restaurant
+}));
+
+// ---------------------------------------------------------
 // Export mocks
 //
 export {
@@ -610,4 +680,5 @@ export {
   mockGooglePlacesService,
   mockRestaurantInstance,
   mockRestaurantService,
+  Restaurant
 };

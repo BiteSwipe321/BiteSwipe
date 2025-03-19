@@ -1,13 +1,11 @@
 // Import from setup.ts to use the centralized mocks for other dependencies
 import './unittest_setup';
+import { mockRestaurantModel, Restaurant } from './unittest_setup';
 
 import { Types } from 'mongoose';
 
-// Import the Restaurant model (which is already mocked in setup.ts)
-import { Restaurant, IRestaurant } from '../../models/restaurant';
-
-// Access to the mockRestaurantInstance from setup.ts
-const mockRestaurantInstance = (Restaurant as any)();
+// Use the mockRestaurantModel from unittest_setup.ts
+const mockRestaurantInstance = mockRestaurantModel;
 
 // Simple tests for the Restaurant model
 describe('Restaurant Model', () => {
@@ -29,7 +27,7 @@ describe('Restaurant Model', () => {
     // Expected output: Restaurant instance with matching properties
 
     // Create a new restaurant with basic fields
-    const restaurantData: Partial<IRestaurant> = {
+    const restaurantData = {
       name: 'Test Restaurant',
       location: {
         address: '123 Test St, City, Country',
