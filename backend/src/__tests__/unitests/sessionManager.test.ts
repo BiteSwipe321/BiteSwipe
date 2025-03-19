@@ -3,7 +3,7 @@ import './unittest_setup';
 import { Express } from 'express';
 import request from 'supertest';
 import { createApp } from '../../app';
-import { mockSessionManager, mockRestaurantService } from '../../../TEMP/setup';
+import { mockSessionManager } from './unittest_setup';
 
 let app: Express;
 

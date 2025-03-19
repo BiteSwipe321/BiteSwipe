@@ -1,5 +1,13 @@
-
 import mongoose from "mongoose";
+import { config } from "dotenv";
+import path from "path";
+
+// Load test environment variables
+config({ path: path.join(__dirname, "../../../.env") });
+
+// Set environment variables for test mode
+process.env.NODE_ENV = 'test';
+process.env.TEST_TYPE = 'unmocked';
 
 // Configure mongoose
 mongoose.set('strictQuery', false);

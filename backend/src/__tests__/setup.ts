@@ -22,6 +22,9 @@ if (result.error) {
   );
 }
 
+// Set environment variables for test mode
+process.env.NODE_ENV = 'test';
+
 // Validate required environment variables
 const requiredEnvVars = [
   "DB_URI",

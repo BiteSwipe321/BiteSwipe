@@ -1,7 +1,7 @@
 import './unittest_setup';
 
 // Import dependencies after mocking
-
+import { mockGooglePlacesService, mockRestaurantInstance } from './unittest_setup';
 import { GooglePlacesService } from '../../services/externalAPIs/googleMaps';
 
 // MUST KEEP. We need to undo the mock from the setup since we are testing the unmocked version

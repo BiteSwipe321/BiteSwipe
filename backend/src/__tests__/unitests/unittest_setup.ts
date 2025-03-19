@@ -1,8 +1,13 @@
 import { config } from "dotenv";
 import path from "path";
+import mongoose from "mongoose";
 
 // Load test environment variables
-config({ path: path.join(__dirname, "test.env") });
+config({ path: path.join(__dirname, "../../../.env") });
+
+// Set environment variables for test mode
+process.env.NODE_ENV = 'test';
+process.env.TEST_TYPE = 'unittest';
 
 // ---------------------------------------------------------
 // Mock Functions
@@ -35,7 +40,7 @@ interface SessionModelInstance {
 }
 
 interface SessionModelConstructor {
-  new (data: SessionData): SessionModelInstance;
+  new(data: SessionData): SessionModelInstance;
   create: jest.Mock;
   findOne: jest.Mock;
   findById: jest.Mock;
@@ -195,7 +200,7 @@ function createUserModelMock() {
     const mockObj = {
       lean: jest.fn()
     };
-    
+
     // Only return existing user for specific email addresses
     if (query && query.email === "existing@example.com") {
       mockObj.lean = jest.fn().mockReturnValue({
@@ -407,6 +412,34 @@ function createGooglePlacesServiceMock() {
 // ---------------------------------------------------------
 // External APIs and Services
 //
+
+// Create mock instances
+const mockUserModel = createUserModelMock();
+const mockSessionModel = createSessionModelMock();
+const mockRestaurantModel = createRestaurantModelMock();
+
+// Create mock restaurant service
+const mockRestaurantService = {
+  getRestaurant: jest.fn(),
+  getRestaurants: jest.fn(),
+  searchRestaurants: jest.fn(),
+  addRestaurants: jest.fn()
+};
+
+const mockRestaurantInstance = {
+  _id: "restaurant123",
+  name: "Test Restaurant",
+  address: "123 Test St",
+  location: { type: "Point", coordinates: [0, 0] },
+  priceLevel: 2,
+  rating: 4.5,
+  userRatingsTotal: 100,
+  photoReference: "photo123",
+  save: jest.fn().mockResolvedValue({}),
+  toObject: jest.fn().mockReturnValue({})
+};
+
+// Mock external services
 jest.mock("../../services/externalAPIs/googleMaps", () => {
   return {
     GooglePlacesService: jest
@@ -510,15 +543,7 @@ jest.mock("mongoose", () => {
 // ---------------------------------------------------------
 // Google Maps
 //
-const mockGooglePlacesService = {
-  searchNearby: jest.fn().mockResolvedValue([]),
-  getPlaceDetails: jest.fn().mockResolvedValue({}),
-  apiKey: "mock-api-key",
-  baseUrl: "https://maps.googleapis.com/maps/api/place",
-  getPhotoUrl: jest.fn().mockImplementation((photoReference, maxWidth) => {
-    return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photoReference}&key=mock-api-key`;
-  }),
-};
+const mockGooglePlacesService = createGooglePlacesServiceMock();
 
 jest.mock("../../services/externalAPIs/googleMaps", () => ({
   GooglePlacesService: jest
@@ -545,11 +570,44 @@ jest.mock("../../config/firebase", () => ({
   },
   getMessaging: jest.fn().mockReturnValue({
     send: jest.fn().mockResolvedValue("mock-message-id"),
-    sendMulticast: jest.fn().mockResolvedValue({responses: [{success: true}]})
+    sendMulticast: jest.fn().mockResolvedValue({ responses: [{ success: true }] })
   }),
 }));
+
+
+//
+//
+//
+// Create mock session manager
+const mockSessionManager = {
+  createSession: jest.fn(),
+  getSession: jest.fn(),
+  joinSession: jest.fn(),
+  leaveSession: jest.fn(),
+  inviteToSession: jest.fn(),
+  getRestaurantsInSession: jest.fn(),
+  userDoneSwiping: jest.fn(),
+  getSessionResults: jest.fn(),
+  // Additional methods needed by tests
+  addPendingInvitation: jest.fn(),
+  rejectInvitation: jest.fn(),
+  sessionSwiped: jest.fn(),
+  startSession: jest.fn(),
+  getResultForSession: jest.fn()
+};
+
+
+
 
 // ---------------------------------------------------------
 // Export mocks
 //
-export { mockGooglePlacesService };
+export {
+  mockUserModel,
+  mockSessionModel,
+  mockSessionManager,
+  mockRestaurantModel,
+  mockGooglePlacesService,
+  mockRestaurantInstance,
+  mockRestaurantService,
+};

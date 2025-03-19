@@ -3,6 +3,10 @@ import path from "path";
 // Load test environment variables
 config({ path: path.join(__dirname, "test.env") });
 
+// Set environment variables for test mode
+process.env.NODE_ENV = 'test';
+process.env.TEST_TYPE = 'mocked';
+
 // ---------------------------------------------------------
 // Mongoose
 //
