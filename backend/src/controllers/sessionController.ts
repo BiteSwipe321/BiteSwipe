@@ -39,48 +39,44 @@ export class SessionController {
 
     async getSession(req: Request, res: Response) {
         try {
-            if(req.params.sessionId.length !== 24) {
-                return res.status(400).json({ error: 'Invalid session ID format' });
-            }
             const sessionId = req.params.sessionId;
-            
             const session = await this.sessionManager.getSession(sessionId) as unknown as MongoDocument;
-            if(!session) {
+            if (!session) {
                 return res.status(404).json({ error: 'Session not found' });
             }
             res.status(200).json(session);
         } catch (error: any) {
             console.error('Error fetching session:', error);
-            
+
             if (error.message === 'Invalid session ID format') {
                 return res.status(400).json({ error: 'Invalid session ID format' });
             } else if (error.code === 'SESSION_NOT_FOUND') {
                 return res.status(404).json({ error: 'Session not found' });
             }
-            
+
             res.status(500).json({ error: 'Internal server error' });
         }
     }
 
     async createSession(req: Request, res: Response) {
         try {
-            const { userId, latitude, longitude, radius } = req.body as { 
-                userId: string, 
-                latitude: string | number, 
-                longitude: string | number, 
-                radius: string | number 
+            const { userId, latitude, longitude, radius } = req.body as {
+                userId: string,
+                latitude: string | number,
+                longitude: string | number,
+                radius: string | number;
             };
-            
+
             // Check for missing required parameters
             if (latitude === undefined || longitude === undefined || radius === undefined) {
                 return res.status(400).json({ error: 'Missing required location parameters' });
             }
-            
+
             // Convert coordinates to numbers
             const lat = typeof latitude === 'string' ? parseFloat(latitude) : latitude;
             const lng = typeof longitude === 'string' ? parseFloat(longitude) : longitude;
             const rad = typeof radius === 'string' ? parseFloat(radius) : radius;
-            
+
             // Validate coordinates
             if (isNaN(lat) || lat < -90 || lat > 90) {
                 return res.status(400).json({ error: 'Invalid latitude value' });
@@ -91,7 +87,7 @@ export class SessionController {
             if (isNaN(rad) || rad <= 0) {
                 return res.status(400).json({ error: 'Invalid radius value' });
             }
-            
+
             const session = await this.sessionManager.createSession(
                 userId,
                 {
@@ -121,11 +117,11 @@ export class SessionController {
             const sessionId = req.params.sessionId;
             const { email } = req.body;
             const user = await this.userService.getUserByEmail(String(email)) as unknown as MongoDocument;
-            
+
             if (!user) {
-                return res.status(404).json({ error: 'No user found with this email'});
+                return res.status(404).json({ error: 'No user found with this email' });
             }
-            
+
             if (!user._id) {
                 return res.status(400).json({ error: 'User has no ID' });
             }
@@ -240,7 +236,7 @@ export class SessionController {
     async sessionSwiped(req: Request, res: Response) {
         try {
             const { sessionId } = req.params;
-            const { userId, restaurantId, liked} = req.body;
+            const { userId, restaurantId, liked } = req.body;
 
             const session = await this.sessionManager.sessionSwiped(sessionId, String(userId), String(restaurantId), Boolean(liked));
 
@@ -248,7 +244,7 @@ export class SessionController {
         } catch (error) {
             console.error(error);
 
-            res.status(500).json({ error }); 
+            res.status(500).json({ error });
         }
     }
 
