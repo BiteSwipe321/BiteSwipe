@@ -428,8 +428,10 @@ export class SessionManager {
                     console.error(error);
                     // console.log(`Failed to complete session: ${sessionId}`);
                 }
-            })();  // Immediately invoke the async function
-        }, (time ?? 5) * 60 * 1000);
+            })().catch((error) => {
+                console.error('Error in completing session:', error);
+            });
+        }, time * 60 * 1000);  // No need for ?? 5        
 
 
         return session;
@@ -521,7 +523,7 @@ export class SessionManager {
 
         session.finalSelection = {
             restaurantId: new mongoose.Types.ObjectId(winnerRestaurantId),
-            selectedAt: new Date
+            selectedAt: new Date();
         };
 
         await session.save();
