@@ -70,14 +70,13 @@ jobs:
           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
           --environment "$ENV_NAME" \
           --image mongo:latest \
-          --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test MONGO_INITDB_DATABASE=biteswipe \
+          --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test MONGO_INITDB_DATABASE=biteswipe "MONGOD_ARGS=--bind_ip_all" \
           --target-port 27017 \
           --ingress external \
           --min-replicas 1 \
           --max-replicas 1 \
           --cpu 0.5 \
           --memory 1.0Gi \
-          --command-line "mongod --bind_ip_all --port 27017" \
           --query properties.configuration.ingress.fqdn
           
         # Wait for the MongoDB container to be ready
@@ -105,8 +104,7 @@ jobs:
         
         # Test the MongoDB connection
         echo "Testing MongoDB connection..."
-        apt-get update && apt-get install -y mongodb-clients
-        timeout 10 mongosh "$MONGODB_URI" --eval "db.stats()" || echo "Connection test timed out - container may still be initializing"
+        echo "Note: Connection will be tested during the test run"
         
         # Verify the environment variables were set
         echo "Verifying environment variables:"
