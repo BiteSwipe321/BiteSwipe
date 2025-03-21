@@ -70,10 +70,19 @@ jobs:
           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
           --environment "$ENV_NAME" \
           --image mongo:latest \
-          --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test \
+          --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test MONGO_INITDB_DATABASE=biteswipe \
           --target-port 27017 \
           --ingress external \
+          --min-replicas 1 \
+          --max-replicas 1 \
+          --cpu 0.5 \
+          --memory 1.0Gi \
+          --command-line "mongod --bind_ip_all --port 27017" \
           --query properties.configuration.ingress.fqdn
+          
+        # Wait for the MongoDB container to be ready
+        echo "Waiting for MongoDB container to be ready..."
+        sleep 30
       # Azure login is already done at the beginning of the job
 
     - name: Set MongoDB connection string
@@ -87,11 +96,17 @@ jobs:
         echo "MongoDB FQDN: $MONGO_FQDN"
         
         # Set the MongoDB connection string for later steps
-        MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017/biteswipe"
+        # Using root auth credentials and authSource=admin for proper authentication
+        MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017/biteswipe?authSource=admin"
         echo "Setting MongoDB connection string: ${MONGODB_URI//:test@/:***@}"
         echo "MONGODB_URI=$MONGODB_URI" >> $GITHUB_ENV
         echo "DB_URI=$MONGODB_URI" >> $GITHUB_ENV
         echo "MONGO_FQDN=$MONGO_FQDN" >> $GITHUB_ENV
+        
+        # Test the MongoDB connection
+        echo "Testing MongoDB connection..."
+        apt-get update && apt-get install -y mongodb-clients
+        timeout 10 mongosh "$MONGODB_URI" --eval "db.stats()" || echo "Connection test timed out - container may still be initializing"
         
         # Verify the environment variables were set
         echo "Verifying environment variables:"
@@ -178,11 +193,7 @@ jobs:
       run: |
         cat > .env << EOF
         PORT=3000
-        # Try without authentication first
-        DB_URI=mongodb://biteswipe-mongodb-test-pr56.proudtree-f2417f8d.eastus.azurecontainerapps.io:27017/biteswipe
-        # Alternative connection strings (commented out)
-        # DB_URI=mongodb://test:test@biteswipe-mongodb-test-pr56.proudtree-f2417f8d.eastus.azurecontainerapps.io:27017/biteswipe
-        # DB_URI=mongodb://biteswipe-mongodb-test-pr56.proudtree-f2417f8d.eastus.azurecontainerapps.io:27017/biteswipe?directConnection=true
+        DB_URI=mongodb://test:test@${{ env.MONGO_FQDN }}:27017/biteswipe?authSource=admin
         NODE_ENV=test
         GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
         FIREBASE_CREDENTIALS_JSON_PATHNAME=${{ github.workspace }}/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
