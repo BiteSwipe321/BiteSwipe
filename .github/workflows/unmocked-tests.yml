@@ -1,0 +1,140 @@
+name: Unmocked Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18.x'
+  RESOURCE_GROUP: CPEN321RSRCGROUP-biteswipe-resources
+  PR_NUMBER: ${{ github.event.pull_request.number || 'main' }}
+
+jobs:
+  setup-mongodb:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Deploy MongoDB to Azure Container Apps
+      run: |
+        az containerapp create \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
+          --image mongo:latest \
+          --command mongod \
+          --args "--bind_ip_all" \
+          --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test \
+          --target-port 27017 \
+          --ingress external \
+          --registry-server docker.io \
+          --query properties.configuration.ingress.fqdn
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Wait for MongoDB to be ready
+      run: |
+        sleep 30  # Give MongoDB time to start
+
+  test:
+    needs: setup-mongodb
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Download Firebase Credentials
+      run: |
+        # Function to download with retries
+        download_with_retry() {
+          max_attempts=3
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts to download Firebase credentials..."
+            
+            # Try to download using Azure CLI with key authentication
+            if az storage blob download \
+              --account-name productionstorageaccoun2 \
+              --container-name production-container \
+              --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+              --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+              --auth-mode key 2>/dev/null; then
+              # Verify the file exists and is not empty
+              if [ -s biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
+                echo "Download successful and file is valid!"
+                return 0
+              else
+                echo "Download succeeded but file is empty or missing!"
+                rm -f biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+                return 1
+              fi
+            fi
+            
+            echo "Download failed. Waiting 5 seconds before retry..."
+            sleep 5
+            attempt=$((attempt + 1))
+          done
+          echo "Failed to download after $max_attempts attempts"
+          return 1
+        }
+
+        # Try to download with retries
+        if download_with_retry; then
+          # Set proper permissions
+          chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+          echo "Firebase credentials downloaded and secured successfully"
+        else
+          echo "Failed to download Firebase credentials after all retries"
+          exit 1
+        fi
+
+    - name: Create .env file
+      run: |
+        echo "PORT=3000" > .env
+        echo "DB_URI=mongodb://test:test@biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io:27017" >> .env
+        echo "NODE_ENV=test" >> .env
+        echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
+        echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
+      
+    - name: Run unmocked tests
+      run: npm test
+
+  cleanup:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Delete MongoDB Container App
+      run: |
+        az containerapp delete \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
+          --yes
+      env:
+        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }} 
