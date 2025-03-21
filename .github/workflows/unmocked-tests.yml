@@ -191,30 +191,30 @@ jobs:
         echo "Running unmocked tests with coverage..."
         npm run test:coverage:unmocked
 
-  cleanup:
-    needs: test
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+  # cleanup:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   if: always()
+  #   steps:
+  #   - name: Azure Login
+  #     uses: azure/login@v1
+  #     with:
+  #       creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Delete MongoDB Container App
-      run: |
-        echo "Cleaning up MongoDB Container App..."
-        # Check if the container app exists before trying to delete it
-        if az containerapp show --resource-group ${{ env.RESOURCE_GROUP }} --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} &> /dev/null; then
-          echo "Deleting container app biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}..."
-          az containerapp delete \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
-            --yes
-        else
-          echo "Container app biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} doesn't exist or was already deleted"
-        fi
+  #   - name: Delete MongoDB Container App
+  #     run: |
+  #       echo "Cleaning up MongoDB Container App..."
+  #       # Check if the container app exists before trying to delete it
+  #       if az containerapp show --resource-group ${{ env.RESOURCE_GROUP }} --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} &> /dev/null; then
+  #         echo "Deleting container app biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}..."
+  #         az containerapp delete \
+  #           --resource-group ${{ env.RESOURCE_GROUP }} \
+  #           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
+  #           --yes
+  #       else
+  #         echo "Container app biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} doesn't exist or was already deleted"
+  #       fi
         
-        # Note: We're not deleting the resource group or environment as they may be shared
-        # between different workflow runs
-      # Azure login is already done at the beginning of the job
+  #       # Note: We're not deleting the resource group or environment as they may be shared
+  #       # between different workflow runs
+  #     # Azure login is already done at the beginning of the job
