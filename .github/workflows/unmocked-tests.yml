@@ -41,10 +41,24 @@ jobs:
         # Check Azure CLI version
         az --version
         
-        # Use a simpler approach without command args
+        # First, check if the environment exists
+        ENV_NAME="biteswipe-env"
+        if ! az containerapp env show --resource-group ${{ env.RESOURCE_GROUP }} --name "$ENV_NAME" &> /dev/null; then
+          echo "Creating Container App environment $ENV_NAME..."
+          az containerapp env create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name "$ENV_NAME" \
+            --location eastus
+        else
+          echo "Container App environment $ENV_NAME already exists"
+        fi
+        
+        # Now create the container app with the environment
+        echo "Creating MongoDB container app..."
         az containerapp create \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
+          --environment "$ENV_NAME" \
           --image mongo:latest \
           --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test \
           --target-port 27017 \
