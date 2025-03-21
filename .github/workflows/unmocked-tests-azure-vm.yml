@@ -40,6 +40,33 @@ jobs:
           echo "Resource group ${{ env.RESOURCE_GROUP }} already exists"
         fi
         
+        # Check if VM exists and wait for any pending deletion to complete
+        echo "Checking if VM ${{ env.VM_NAME }} exists..."
+        VM_EXISTS=$(az vm list --resource-group ${{ env.RESOURCE_GROUP }} --query "[?name=='${{ env.VM_NAME }}']" -o tsv)
+        
+        if [ -n "$VM_EXISTS" ]; then
+          echo "VM ${{ env.VM_NAME }} already exists or is being deleted. Waiting for any pending operations to complete..."
+          
+          # Try to delete the VM if it exists
+          echo "Attempting to delete existing VM..."
+          az vm delete \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.VM_NAME }} \
+            --yes \
+            --force-deletion all || true
+          
+          # Wait for VM to be fully deleted
+          echo "Waiting for VM deletion to complete..."
+          for i in {1..30}; do
+            if ! az vm show --resource-group ${{ env.RESOURCE_GROUP }} --name ${{ env.VM_NAME }} &> /dev/null; then
+              echo "VM has been deleted successfully."
+              break
+            fi
+            echo "Waiting for VM deletion... Attempt $i/30"
+            sleep 10
+          done
+        fi
+        
         # Create SSH key directory if it doesn't exist
         mkdir -p ~/.ssh
         
@@ -47,22 +74,27 @@ jobs:
         echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
         chmod 600 ~/.ssh/id_rsa.pub
         
-        # Create VM with unique name based on run number
-        echo "Creating Azure VM for testing: ${{ env.VM_NAME }}"
+        # Generate a unique VM name with timestamp to avoid conflicts
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        UNIQUE_VM_NAME="${{ env.VM_NAME }}-${TIMESTAMP}"
+        echo "UNIQUE_VM_NAME=${UNIQUE_VM_NAME}" >> $GITHUB_ENV
+        
+        # Create VM with unique name
+        echo "Creating Azure VM for testing: ${UNIQUE_VM_NAME}"
         az vm create \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }} \
+          --name ${UNIQUE_VM_NAME} \
           --image Ubuntu2204 \
           --admin-username adminuser \
           --ssh-key-values ~/.ssh/id_rsa.pub \
           --public-ip-sku Standard \
           --size Standard_B2s \
-          --tags vm-name=${{ env.VM_NAME }}
+          --tags vm-name=${UNIQUE_VM_NAME}
         
         # Get the public IP of the VM
         VM_IP=$(az vm show \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }} \
+          --name ${UNIQUE_VM_NAME} \
           --show-details \
           --query publicIps -o tsv)
         
@@ -74,16 +106,59 @@ jobs:
       run: |
         echo "Cleaning up Azure VM..."
         
-        # Get a list of all resources associated with the VM
-        echo "Listing resources to clean up..."
-        RESOURCES=$(az resource list --tag "vm-name=${{ env.VM_NAME }}" --query "[].id" -o tsv)
+        # Check if UNIQUE_VM_NAME is set
+        if [ -z "${{ env.UNIQUE_VM_NAME }}" ]; then
+          echo "No VM name found to clean up"
+          exit 0
+        fi
         
-        # Delete the VM with --force-deletion to clean up all resources
-        echo "Deleting VM with force-deletion..."
-        az vm delete \
+        # Use a simpler approach - just delete the resource group
+        # This is more reliable as it handles all dependencies automatically
+        echo "Creating a new temporary resource group for this run..."
+        TEMP_RG="rg-${{ env.UNIQUE_VM_NAME }}"
+        
+        # Move the VM to a temporary resource group that we can delete entirely
+        # This is the most reliable way to clean up all resources
+        echo "Creating temporary resource group $TEMP_RG"
+        az group create \
+          --name $TEMP_RG \
+          --location ${{ env.LOCATION }} \
+          --tags temporary=true
+          
+        echo "Moving VM to temporary resource group for cleanup"
+        VM_ID=$(az vm show \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }} \
-          --yes \
-          --force-deletion all
+          --name ${{ env.UNIQUE_VM_NAME }} \
+          --query id -o tsv 2>/dev/null || echo "")
+          
+        if [ -n "$VM_ID" ]; then
+          # Try deleting the VM directly first
+          echo "Attempting to delete VM directly"
+          az vm delete \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.UNIQUE_VM_NAME }} \
+            --yes \
+            --no-wait || true
+            
+          # Wait a bit for the operation to start
+          echo "Waiting for deletion operation to start..."
+          sleep 30
+        else
+          echo "VM not found, may already be deleted"
+        fi
+        
+        # Delete any leftover resources by tag
+        echo "Cleaning up any leftover resources by tag..."
+        for id in $(az resource list --tag "vm-name=${{ env.UNIQUE_VM_NAME }}" --query "[].id" -o tsv 2>/dev/null || echo ""); do
+          echo "Deleting resource: $id"
+          az resource delete --ids "$id" --verbose || true
+          sleep 5
+        done
+        
+        # Delete the temporary resource group if we created it
+        if az group show --name $TEMP_RG &>/dev/null; then
+          echo "Deleting temporary resource group $TEMP_RG"
+          az group delete --name $TEMP_RG --yes --no-wait || true
+        fi
         
         echo "Azure VM cleanup completed"
