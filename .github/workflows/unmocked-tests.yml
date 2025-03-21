@@ -87,12 +87,16 @@ jobs:
         echo "MongoDB FQDN: $MONGO_FQDN"
         
         # Set the MongoDB connection string for later steps
-        MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017"
+        MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017/biteswipe"
         echo "Setting MongoDB connection string: ${MONGODB_URI//:test@/:***@}"
         echo "MONGODB_URI=$MONGODB_URI" >> $GITHUB_ENV
+        echo "DB_URI=$MONGODB_URI" >> $GITHUB_ENV
+        echo "MONGO_FQDN=$MONGO_FQDN" >> $GITHUB_ENV
         
-        # Note: We're not waiting for MongoDB to be ready here
-        # The tests should have retry logic for database connections
+        # Verify the environment variables were set
+        echo "Verifying environment variables:"
+        echo "MONGODB_URI=${MONGODB_URI//:test@/:***@}"
+        echo "DB_URI=${MONGODB_URI//:test@/:***@}"
 
   test:
     needs: setup-mongodb
@@ -172,15 +176,14 @@ jobs:
     - name: Create .env file
       working-directory: ./backend
       run: |
-        echo "Creating .env file with proper configuration..."
-        echo "PORT=3000" > .env
-        echo "DB_URI=${{ env.MONGODB_URI }}" >> .env
-        echo "NODE_ENV=test" >> .env
-        echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
-        echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
-        
-        echo "Contents of .env file (redacted):"
-        cat .env | sed 's/=.*/=REDACTED/g'
+        cat > .env << EOF
+        PORT=3000
+        DB_URI=mongodb://test:test@${{ env.MONGO_FQDN }}:27017/biteswipe
+        NODE_ENV=test
+        GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+        FIREBASE_CREDENTIALS_JSON_PATHNAME=${{ github.workspace }}/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+        EOF
+        cat .env
       
     - name: Run unmocked tests
       working-directory: ./backend
