@@ -116,8 +116,8 @@ jobs:
         fi
 
     - name: Download Firebase Credentials
-      working-directory: ./backend
       run: |
+        # Azure login is already done at the beginning of the job
         # Function to download with retries
         download_with_retry() {
           max_attempts=5
@@ -127,29 +127,23 @@ jobs:
             
             # Try to download using Azure CLI with current authentication
             if az storage blob download \
-              --account-name productionstorageaccoun2 \
-              --container-name secrets \
-              --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-              --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json; then
-              # Verify the file exists and is not empty
-              if [ -s biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
-                echo "Download successful and file is valid! Size: $(wc -c < biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json) bytes"
-                return 0
-              else
-                echo "Download succeeded but file is empty or missing!"
-                rm -f biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-                return 1
-              fi
+                --account-name productionstorageaccoun2 \
+                --container-name secrets \
+                --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+                --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+                --auth-mode login; then
+                # Verify the file exists and is not empty
+                if [ -s backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
+                  echo "Download successful and file is valid!"
+                  return 0
+                else
+                  echo "Download succeeded but file is empty or missing!"
+                  rm -f backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+                  return 1
+                fi
             fi
             
             echo "Download failed. Waiting 5 seconds before retry..."
-            echo "Detailed error output:"
-            az storage blob download \
-              --account-name productionstorageaccoun2 \
-              --container-name secrets \
-              --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-              --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json 2>&1
-            
             sleep 5
             attempt=$((attempt + 1))
           done
@@ -159,21 +153,11 @@ jobs:
 
         # Try to download with retries
         if download_with_retry; then
-          # Set proper permissions
-          chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-          echo "Firebase credentials downloaded and secured successfully"
-          
-          # Verify the file content type
-          echo "Verifying file content type..."
-          if file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json | grep -q "JSON"; then
-            echo "File verified as JSON"
-          else
-            echo "Warning: File may not be valid JSON"
-            cat biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json | head -10
-          fi
+            chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+            echo "Firebase credentials downloaded and secured successfully"
         else
-          echo "Failed to download Firebase credentials after all retries"
-          exit 1
+            echo "Failed to download Firebase credentials after all retries"
+            exit 1
         fi
 
     - name: Create .env file
@@ -188,78 +172,29 @@ jobs:
         
         echo "Contents of .env file (redacted):"
         cat .env | sed 's/=.*/=REDACTED/g'
+        
+        # Verify Firebase credentials file exists
+        if [ -f "biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" ]; then
+          echo "Firebase credentials file exists in backend directory"
+          ls -la biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+        else
+          echo "WARNING: Firebase credentials file not found in backend directory!"
+          echo "Looking for file in parent directory..."
+          if [ -f "../backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" ]; then
+            echo "Found Firebase credentials in ../backend directory, copying to current directory"
+            cp ../backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json .
+            chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+          else
+            echo "ERROR: Firebase credentials file not found in any expected location!"
+            find .. -name "biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" -type f 2>/dev/null || echo "No Firebase credentials file found in parent directories"
+          fi
+        fi
       
     - name: Run unmocked tests
       working-directory: ./backend
       run: |
-        echo "Validating MongoDB connection..."
-        cat > validate-connection.js << 'EOL'
-        const mongoose = require("mongoose");
-        const uri = process.env.DB_URI;
-        
-        console.log(`Attempting to connect to MongoDB at: ${uri.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}`);
-        
-        // Add connection options for better reliability
-        mongoose.connect(uri, {
-          serverSelectionTimeoutMS: 30000,  // Increased timeout
-          socketTimeoutMS: 60000,          // Increased timeout
-          connectTimeoutMS: 30000,         // Increased timeout
-          retryWrites: true,
-          retryReads: true,
-          maxPoolSize: 10,                 // Added connection pool size
-          heartbeatFrequencyMS: 10000      // Added heartbeat frequency
-        })
-        .then(() => {
-          console.log("MongoDB connection successful!");
-          return mongoose.connection.db.admin().ping();
-        })
-        .then(() => {
-          console.log("MongoDB ping successful!");
-          process.exit(0);
-        })
-        .catch(err => {
-          console.error("MongoDB connection failed:", err);
-          process.exit(1);
-        });
-        EOL
-        
-        # Retry MongoDB connection validation
-        max_connection_attempts=5
-        connection_attempt=1
-        while [ $connection_attempt -le $max_connection_attempts ]; do
-          echo "Connection validation attempt $connection_attempt of $max_connection_attempts"
-          if node validate-connection.js; then
-            echo "MongoDB connection validated successfully!"
-            break
-          fi
-          
-          if [ $connection_attempt -eq $max_connection_attempts ]; then
-            echo "Failed to connect to MongoDB after $max_connection_attempts attempts"
-            echo "Continuing anyway, tests may handle connection retry internally"
-          else
-            echo "Connection failed. Waiting 10 seconds before retry..."
-            sleep 10
-          fi
-          connection_attempt=$((connection_attempt + 1))
-        done
-        
-        echo "Running unmocked tests..."
-        # Add retries for test execution
-        max_attempts=3
-        attempt=1
-        while [ $attempt -le $max_attempts ]; do
-          echo "Test attempt $attempt of $max_attempts"
-          if npm run test:coverage:unmocked; then
-            echo "Tests completed successfully!"
-            exit 0
-          fi
-          echo "Tests failed. Waiting before retry..."
-          sleep 5
-          attempt=$((attempt + 1))
-        done
-        
-        echo "Tests failed after $max_attempts attempts"
-        exit 1
+        echo "Running unmocked tests with coverage..."
+        npm run test:coverage:unmocked
 
   cleanup:
     needs: test
