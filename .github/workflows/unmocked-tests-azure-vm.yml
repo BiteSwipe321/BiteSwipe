@@ -142,34 +142,30 @@ jobs:
         echo "Copying project files to VM..."
         scp -o StrictHostKeyChecking=no -r ./* adminuser@${{ env.VM_IP }}:~/biteswipe/
 
-    - name: Download Firebase credentials to VM
+    - name: Download Firebase credentials
       run: |
-        # Create a script to download Firebase credentials on the VM
-        cat > download_firebase.sh << 'EOF'
-        #!/bin/bash
-        cd ~/biteswipe/backend
+        # Create directory for Firebase credentials
+        mkdir -p firebase-credentials
         
-        # Install Azure CLI
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        
-        # Download Firebase credentials
+        # Download Firebase credentials to the runner
+        echo "Downloading Firebase credentials..."
         attempt=0
         max_attempts=5
         
         while [ $attempt -lt $max_attempts ]; do
-          echo "Downloading Firebase credentials (attempt $((attempt+1))/$max_attempts)..."
+          echo "Attempt $((attempt+1))/$max_attempts"
           
-          # Download the file using Azure CLI with key authentication
+          # Download the file using Azure CLI
           az storage blob download \
             --account-name productionstorageaccoun2 \
             --container-name production-container \
             --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-            --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-            --auth-mode key \
-            --account-key $1 && break
+            --file firebase-credentials/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+            --account-key="${{ secrets.AZURE_STORAGE_KEY }}" && break
           
           # Check if file exists and has content
-          if [ -f biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ] && [ -s biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
+          if [ -f firebase-credentials/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ] && \
+             [ -s firebase-credentials/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
             echo "File downloaded successfully"
             break
           fi
@@ -185,14 +181,15 @@ jobs:
         fi
         
         # Set proper permissions
-        chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-        echo "Firebase credentials downloaded and secured successfully"
-        EOF
+        chmod 600 firebase-credentials/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
         
-        # Copy the script to VM and execute it
-        chmod +x download_firebase.sh
-        scp -o StrictHostKeyChecking=no download_firebase.sh adminuser@${{ env.VM_IP }}:~/
-        ssh -o StrictHostKeyChecking=no adminuser@${{ env.VM_IP }} "~/download_firebase.sh '${{ secrets.AZURE_STORAGE_KEY }}'"
+        # Copy Firebase credentials to VM
+        echo "Copying Firebase credentials to VM..."
+        ssh -o StrictHostKeyChecking=no adminuser@${{ env.VM_IP }} "mkdir -p ~/biteswipe/backend/firebase-credentials"
+        scp -o StrictHostKeyChecking=no firebase-credentials/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+          adminuser@${{ env.VM_IP }}:~/biteswipe/backend/firebase-credentials/
+        
+        echo "Firebase credentials copied to VM successfully"
 
     - name: Setup and Run Tests
       run: |
@@ -236,7 +233,7 @@ jobs:
         DB_URI=mongodb://test:test@localhost:27017/biteswipe?authSource=admin
         NODE_ENV=test
         GOOGLE_MAPS_API_KEY=$2
-        FIREBASE_CREDENTIALS_JSON_PATHNAME=/home/adminuser/biteswipe/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+        FIREBASE_CREDENTIALS_JSON_PATHNAME=/home/adminuser/biteswipe/backend/firebase-credentials/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
         EOFINNER
         
         # Display .env file for verification
@@ -267,23 +264,37 @@ jobs:
       if: always()
       run: |
         echo "Cleaning up Azure VM..."
-        # Delete the VM and its resources
+        
+        # Delete the VM first
+        echo "Deleting VM..."
         az vm delete \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name ${{ env.VM_NAME }} \
           --yes
         
-        # Delete the associated resources
+        # Delete the network interface
+        echo "Deleting network interface..."
+        az network nic delete \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }}VMNic
+        
+        # Delete the network security group
+        echo "Deleting network security group..."
         az network nsg delete \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name ${{ env.VM_NAME }}NSG
         
+        # Delete the public IP
+        echo "Deleting public IP..."
         az network public-ip delete \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name ${{ env.VM_NAME }}PublicIP
         
-        az network vnet delete \
+        # Delete the disk
+        echo "Deleting OS disk..."
+        az disk delete \
           --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }}VNET
+          --name ${{ env.VM_NAME }}_OsDisk_1_* \
+          --yes || true
         
         echo "Azure VM cleanup completed"
