@@ -115,15 +115,23 @@ jobs:
           exit 1
         fi
 
+    - name: Azure Login for Firebase Credentials
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
     - name: Download Firebase Credentials
       run: |
-        # Azure login is already done at the beginning of the job
         # Function to download with retries
         download_with_retry() {
           max_attempts=5
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts to download Firebase credentials..."
+            
+            # Verify Azure login status
+            echo "Verifying Azure login status..."
+            az account show || { echo "Azure login required"; return 1; }
             
             # Try to download using Azure CLI with current authentication
             if az storage blob download \
