@@ -400,7 +400,7 @@ def import_existing_resources(owner_tag):
     
     return success
 
-def run_terraform_commands(owner_tag):
+def run_terraform_commands(owner_tag, run_mode="app"):
     """Run Terraform plan and apply commands with prompt for approval."""
     print("\n🔍 Running Terraform init...")
     if not run_command("terraform init", cwd=TERRAFORM_DIR):
@@ -423,7 +423,8 @@ def run_terraform_commands(owner_tag):
         print("Continuing with deployment...")
         
     print("\n📋 Running Terraform plan...")
-    if not run_command("terraform plan -out=tfplan", cwd=TERRAFORM_DIR):
+    plan_cmd = f"terraform plan -var=\"owner_tag={owner_tag}\" -var=\"run_mode={run_mode}\" -out=tfplan"
+    if not run_command(plan_cmd, cwd=TERRAFORM_DIR):
         return False
         
     print("\n🚀 Running Terraform apply...")
@@ -481,7 +482,7 @@ def update_ssh_config():
     )
 
 
-def main(prefix=None):
+def main(prefix=None, run_mode="app"):
     """Main function to deploy infrastructure."""
     # Get owner tag and generate terraform.tfvars
     owner_tag = get_owner_tag(prefix)
@@ -497,7 +498,7 @@ def main(prefix=None):
     if not run_command(f"{generate_tfvars_script} {owner_tag}", cwd=script_dir):
         sys.exit(1)
     
-    run_terraform_commands(owner_tag)
+    run_terraform_commands(owner_tag, run_mode)
     update_ssh_config()
 
 
@@ -506,6 +507,8 @@ if __name__ == "__main__":
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='Deploy Azure infrastructure for BiteSwipe.')
     parser.add_argument('--prefix', type=str, help='Prefix for resource names (overrides GITHUB_ACTOR/username)')
+    parser.add_argument('--run-mode', type=str, choices=['test', 'app'], default='app', 
+                        help='Mode to run: "test" to run tests, "app" to run the application (default: app)')
     parser.add_argument('--destroy', action='store_true', help='Destroy infrastructure instead of creating it')
     args = parser.parse_args()
     
@@ -515,4 +518,5 @@ if __name__ == "__main__":
         terraform_destroy(get_owner_tag(args.prefix))
     else:
         # Create/update infrastructure
-        main(args.prefix)
+        run_mode = args.run_mode if hasattr(args, 'run_mode') else 'app'
+        main(args.prefix, run_mode)

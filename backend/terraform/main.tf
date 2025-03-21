@@ -483,18 +483,38 @@ EOF
           echo '[Deploy] Stopping existing containers...'
           docker-compose down --remove-orphans || true
           
-          echo '[Deploy] Building and starting containers...'
-          docker-compose up -d --build
-          if [ \$? -ne 0 ]; then
-            echo \"[Deploy] ERROR: Docker-compose failed\"
-            docker-compose logs
-            exit 1
+          # Determine which service to run based on run_mode
+          if [ "${var.run_mode}" = "test" ]; then
+            echo '[Deploy] Building and starting test containers...'
+            docker-compose up -d --build test
+            if [ \$? -ne 0 ]; then
+              echo \"[Deploy] ERROR: Docker-compose failed\"
+              docker-compose logs
+              exit 1
+            fi
+            echo '[Deploy] Test containers started successfully!'
+            
+            # Wait for containers to stabilize
+            echo '[Deploy] Waiting for containers to be ready...'
+            sleep 15
+            
+            # Follow test logs
+            echo '[Deploy] Following test logs...'
+            docker-compose logs -f test
+          else
+            echo '[Deploy] Building and starting nginx container...'
+            docker-compose up -d --build nginx
+            if [ \$? -ne 0 ]; then
+              echo \"[Deploy] ERROR: Docker-compose failed\"
+              docker-compose logs
+              exit 1
+            fi
+            echo '[Deploy] Application containers started successfully!'
+            
+            # Wait for containers to stabilize
+            echo '[Deploy] Waiting for containers to be ready...'
+            sleep 15
           fi
-          echo '[Deploy] Containers started successfully!'
-          
-          # Wait for containers to stabilize
-          echo '[Deploy] Waiting for containers to be ready...'
-          sleep 15
           
           # Check if containers are running
           RUNNING_CONTAINERS=\$(docker ps --format '{{.Names}}' | wc -l)
