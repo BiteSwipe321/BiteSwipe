@@ -95,8 +95,8 @@ jobs:
         echo "MongoDB FQDN: $MONGO_FQDN"
         
         # Set the MongoDB connection string for later steps
-        # Using root auth credentials and authSource=admin for proper authentication
-        MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017/biteswipe?authSource=admin"
+        # Format compatible with unmocked_setup.ts parsing
+        MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017/biteswipe"
         echo "Setting MongoDB connection string: ${MONGODB_URI//:test@/:***@}"
         echo "MONGODB_URI=$MONGODB_URI" >> $GITHUB_ENV
         echo "DB_URI=$MONGODB_URI" >> $GITHUB_ENV
@@ -191,7 +191,9 @@ jobs:
       run: |
         cat > .env << EOF
         PORT=3000
-        DB_URI=mongodb://test:test@${{ env.MONGO_FQDN }}:27017/biteswipe?authSource=admin
+        # Format the DB_URI to be compatible with unmocked_setup.ts parsing
+        # The authSource parameter will be added by mongoose defaults
+        DB_URI=mongodb://test:test@${{ env.MONGO_FQDN }}:27017/biteswipe
         NODE_ENV=test
         GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
         FIREBASE_CREDENTIALS_JSON_PATHNAME=${{ github.workspace }}/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
