@@ -38,12 +38,14 @@ jobs:
 
     - name: Deploy MongoDB to Azure Container Apps
       run: |
+        # Check Azure CLI version
+        az --version
+        
+        # Use a simpler approach without command args
         az containerapp create \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
           --image mongo:latest \
-          --command "mongod" \
-          --command-args "--bind_ip_all" \
           --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test \
           --target-port 27017 \
           --ingress external \
@@ -57,18 +59,39 @@ jobs:
 
     - name: Wait for MongoDB to be ready
       run: |
-        max_attempts=5
+        # Get the FQDN from the container app
+        MONGO_FQDN=$(az containerapp show \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
+          --query properties.configuration.ingress.fqdn -o tsv)
+          
+        echo "MongoDB FQDN: $MONGO_FQDN"
+        
+        # Wait for MongoDB to be ready
+        max_attempts=10
         attempt=1
         while [ $attempt -le $max_attempts ]; do
-          echo "Attempt $attempt to connect to MongoDB..."
-          if nc -z biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io 27017; then
+          echo "Attempt $attempt of $max_attempts to connect to MongoDB..."
+          
+          # Try to ping the MongoDB server
+          if curl -s "http://$MONGO_FQDN:27017/" > /dev/null; then
             echo "MongoDB is ready!"
+            echo "Setting MongoDB connection string for later steps"
+            echo "MONGODB_URI=mongodb://test:test@$MONGO_FQDN:27017" >> $GITHUB_ENV
             exit 0
           fi
+          
+          echo "MongoDB not ready yet. Waiting 15 seconds..."
+          sleep 15
           attempt=$((attempt + 1))
-          sleep 10
         done
-        echo "MongoDB failed to become ready"
+        
+        echo "MongoDB failed to become ready after $max_attempts attempts"
+        echo "Container app status:"
+        az containerapp show \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
+          --query properties.latestRevisionStatus
         exit 1
 
   test:
@@ -158,7 +181,7 @@ jobs:
       run: |
         echo "Creating .env file with proper configuration..."
         echo "PORT=3000" > .env
-        echo "DB_URI=mongodb://test:test@biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io:27017" >> .env
+        echo "DB_URI=${{ env.MONGODB_URI }}" >> .env
         echo "NODE_ENV=test" >> .env
         echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
         echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
