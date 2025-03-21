@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+# Add permissions block
+permissions:
+  id-token: write
+  contents: read
+
 env:
   NODE_VERSION: '18.x'
   RESOURCE_GROUP: CPEN321RSRCGROUP-biteswipe-resources
