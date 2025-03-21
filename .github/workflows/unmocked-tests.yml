@@ -178,7 +178,11 @@ jobs:
       run: |
         cat > .env << EOF
         PORT=3000
-        DB_URI=mongodb://test:test@${{ env.MONGO_FQDN }}:27017/biteswipe
+        # Try without authentication first
+        DB_URI=mongodb://biteswipe-mongodb-test-pr56.proudtree-f2417f8d.eastus.azurecontainerapps.io:27017/biteswipe
+        # Alternative connection strings (commented out)
+        # DB_URI=mongodb://test:test@biteswipe-mongodb-test-pr56.proudtree-f2417f8d.eastus.azurecontainerapps.io:27017/biteswipe
+        # DB_URI=mongodb://biteswipe-mongodb-test-pr56.proudtree-f2417f8d.eastus.azurecontainerapps.io:27017/biteswipe?directConnection=true
         NODE_ENV=test
         GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
         FIREBASE_CREDENTIALS_JSON_PATHNAME=${{ github.workspace }}/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
