@@ -61,7 +61,7 @@ jobs:
         az vm create \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name ${{ env.VM_NAME }} \
-          --image UbuntuLTS \
+          --image Ubuntu2204 \
           --admin-username adminuser \
           --ssh-key-values ~/.ssh/id_rsa.pub \
           --public-ip-sku Standard \
@@ -77,17 +77,19 @@ jobs:
           - gnupg
           - curl
         runcmd:
-          # Install MongoDB directly
-          - curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-          - echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          # Install MongoDB directly for Ubuntu 22.04
+          - wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
+          - echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
           - apt-get update
           - apt-get install -y mongodb-org
           # Configure MongoDB for authentication
+          - mkdir -p /data/db
+          - chown -R mongodb:mongodb /data/db
           - echo 'security:\n  authorization: enabled' >> /etc/mongod.conf
           - systemctl start mongod
           - systemctl enable mongod
           # Create test user
-          - sleep 5 && mongosh --eval "db = db.getSiblingDB('admin'); db.createUser({user:'test',pwd:'test',roles:[{role:'root',db:'admin'}]})"
+          - sleep 10 && mongosh --eval "db = db.getSiblingDB('admin'); db.createUser({user:'test',pwd:'test',roles:[{role:'root',db:'admin'}]})"
         CLOUDCONFIG
         
         # Get the public IP of the VM
