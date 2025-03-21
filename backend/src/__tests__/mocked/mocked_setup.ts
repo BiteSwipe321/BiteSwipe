@@ -108,10 +108,7 @@ jest.mock("../../config/firebase", () => ({
   }),
 }));
 
-// ---------------------------------------------------------
-// Session Manager
-//
-// ---------------------------------------------------------
+
 // Export mocks
 //
 export { mockGooglePlacesService };
