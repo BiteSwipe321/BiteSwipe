@@ -14,7 +14,7 @@ permissions:
 
 env:
   NODE_VERSION: '18.x'
-  RESOURCE_GROUP: CPEN321RSRCGROUP-biteswipe-resources
+  RESOURCE_GROUP: CPEN321RSRCGROUP
   PR_NUMBER: ${{ github.event.pull_request.number || 'main' }}
 
 jobs:
@@ -92,11 +92,14 @@ jobs:
         while [ $attempt -le $max_attempts ]; do
           echo "Attempt $attempt of $max_attempts to connect to MongoDB..."
           
-          # Try to ping the MongoDB server
-          if curl -s "http://$MONGO_FQDN:27017/" > /dev/null; then
-            echo "MongoDB is ready!"
-            echo "Setting MongoDB connection string for later steps"
-            echo "MONGODB_URI=mongodb://test:test@$MONGO_FQDN:27017" >> $GITHUB_ENV
+          # Try to connect to the MongoDB server using nc (netcat)
+          if nc -z -w 5 $MONGO_FQDN 27017; then
+            echo "MongoDB port is open and accepting connections!"
+            
+            # Set the MongoDB connection string for later steps
+            MONGODB_URI="mongodb://test:test@$MONGO_FQDN:27017"
+            echo "Setting MongoDB connection string: ${MONGODB_URI//:test@/:***@}"
+            echo "MONGODB_URI=$MONGODB_URI" >> $GITHUB_ENV
             exit 0
           fi
           
