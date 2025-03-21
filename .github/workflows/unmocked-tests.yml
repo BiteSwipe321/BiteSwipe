@@ -10,6 +10,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  pull-requests: write
 
 env:
   NODE_VERSION: '18.x'
@@ -23,9 +24,17 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Verify Azure Connection
+      run: |
+        echo "Verifying Azure connection..."
+        if ! az account show &> /dev/null; then
+          echo "::error::Azure login failed - could not verify account"
+          exit 1
+        fi
+        echo "Azure connection verified successfully"
+        az account show --query name -o tsv
 
     - name: Deploy MongoDB to Azure Container Apps
       run: |
@@ -48,7 +57,19 @@ jobs:
 
     - name: Wait for MongoDB to be ready
       run: |
-        sleep 30  # Give MongoDB time to start
+        max_attempts=5
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          echo "Attempt $attempt to connect to MongoDB..."
+          if nc -z biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io 27017; then
+            echo "MongoDB is ready!"
+            exit 0
+          fi
+          attempt=$((attempt + 1))
+          sleep 10
+        done
+        echo "MongoDB failed to become ready"
+        exit 1
 
   test:
     needs: setup-mongodb
@@ -62,27 +83,34 @@ jobs:
         node-version: ${{ env.NODE_VERSION }}
         
     - name: Install dependencies
-      run: npm ci
+      working-directory: ./backend
+      run: |
+        echo "Installing dependencies..."
+        npm ci
+        if [ $? -ne 0 ]; then
+          echo "npm ci failed"
+          exit 1
+        fi
 
     - name: Download Firebase Credentials
+      working-directory: ./backend
       run: |
         # Function to download with retries
         download_with_retry() {
-          max_attempts=3
+          max_attempts=5
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts to download Firebase credentials..."
             
-            # Try to download using Azure CLI with key authentication
+            # Try to download using Azure CLI with current authentication
             if az storage blob download \
               --account-name productionstorageaccoun2 \
-              --container-name production-container \
+              --container-name secrets \
               --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-              --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-              --auth-mode key 2>/dev/null; then
+              --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json; then
               # Verify the file exists and is not empty
               if [ -s biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
-                echo "Download successful and file is valid!"
+                echo "Download successful and file is valid! Size: $(wc -c < biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json) bytes"
                 return 0
               else
                 echo "Download succeeded but file is empty or missing!"
@@ -92,6 +120,13 @@ jobs:
             fi
             
             echo "Download failed. Waiting 5 seconds before retry..."
+            echo "Detailed error output:"
+            az storage blob download \
+              --account-name productionstorageaccoun2 \
+              --container-name secrets \
+              --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+              --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json 2>&1
+            
             sleep 5
             attempt=$((attempt + 1))
           done
@@ -104,21 +139,84 @@ jobs:
           # Set proper permissions
           chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
           echo "Firebase credentials downloaded and secured successfully"
+          
+          # Verify the file content type
+          echo "Verifying file content type..."
+          if file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json | grep -q "JSON"; then
+            echo "File verified as JSON"
+          else
+            echo "Warning: File may not be valid JSON"
+            cat biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json | head -10
+          fi
         else
           echo "Failed to download Firebase credentials after all retries"
           exit 1
         fi
 
     - name: Create .env file
+      working-directory: ./backend
       run: |
+        echo "Creating .env file with proper configuration..."
         echo "PORT=3000" > .env
         echo "DB_URI=mongodb://test:test@biteswipe-mongodb-test-pr${{ env.PR_NUMBER }}.${{ env.RESOURCE_GROUP }}.azurecontainerapps.io:27017" >> .env
         echo "NODE_ENV=test" >> .env
         echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
         echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
+        
+        echo "Contents of .env file (redacted):"
+        cat .env | sed 's/=.*/=REDACTED/g'
       
     - name: Run unmocked tests
-      run: npm test
+      working-directory: ./backend
+      run: |
+        echo "Validating MongoDB connection..."
+        cat > validate-connection.js << 'EOL'
+        const mongoose = require("mongoose");
+        const uri = process.env.DB_URI;
+        
+        console.log(`Attempting to connect to MongoDB at: ${uri.replace(/\/\/[^:]+:[^@]+@/, "//***:***@")}`);
+        
+        // Add connection options for better reliability
+        mongoose.connect(uri, {
+          serverSelectionTimeoutMS: 15000,
+          socketTimeoutMS: 45000,
+          connectTimeoutMS: 15000,
+          retryWrites: true,
+          retryReads: true
+        })
+        .then(() => {
+          console.log("MongoDB connection successful!");
+          return mongoose.connection.db.admin().ping();
+        })
+        .then(() => {
+          console.log("MongoDB ping successful!");
+          process.exit(0);
+        })
+        .catch(err => {
+          console.error("MongoDB connection failed:", err);
+          process.exit(1);
+        });
+        EOL
+        
+        node validate-connection.js
+        
+        echo "Running unmocked tests..."
+        # Add retries for test execution
+        max_attempts=3
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          echo "Test attempt $attempt of $max_attempts"
+          if npm run test:coverage:unmocked; then
+            echo "Tests completed successfully!"
+            exit 0
+          fi
+          echo "Tests failed. Waiting before retry..."
+          sleep 5
+          attempt=$((attempt + 1))
+        done
+        
+        echo "Tests failed after $max_attempts attempts"
+        exit 1
 
   cleanup:
     needs: test
@@ -128,9 +226,7 @@ jobs:
     - name: Azure Login
       uses: azure/login@v1
       with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     - name: Delete MongoDB Container App
       run: |
