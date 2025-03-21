@@ -62,7 +62,7 @@ jobs:
           echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=/app/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> backend/.env
 
       - name: Deploy New Infrastructure
-        timeout-minutes: 12  # Set a 5-minute timeout for tests
+        timeout-minutes: 12  # Set a 12-minute timeout for tests
         run: |
           cd backend/scripts
           chmod +x import_resource_group.sh
