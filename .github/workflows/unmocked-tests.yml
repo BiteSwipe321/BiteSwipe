@@ -51,11 +51,7 @@ jobs:
           --ingress external \
           --registry-server docker.io \
           --query properties.configuration.ingress.fqdn
-      env:
-        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # Azure login is already done at the beginning of the job
 
     - name: Wait for MongoDB to be ready
       run: |
@@ -257,8 +253,4 @@ jobs:
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
           --yes
-      env:
-        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }} 
+      # Azure login is already done at the beginning of the job 
