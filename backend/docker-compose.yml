@@ -59,7 +59,7 @@ services:
     container_name: test
     env_file:
       - .env
-    command: ["npm", "run", "test:unmocked"]
+    command: ["npm", "run", "test:coverage:unmocked"]
     depends_on:
       - mongo
     volumes:

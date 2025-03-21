@@ -482,6 +482,28 @@ def update_ssh_config():
     )
 
 
+def terraform_destroy(owner_tag):
+    """Run Terraform destroy command to tear down infrastructure."""
+    set_script_directory()
+    set_terraform_directory()
+    kill_terraform_processes()
+    
+    # Initialize Terraform
+    print("\n🔄 Initializing Terraform...")
+    if not run_command("terraform init", cwd=TERRAFORM_DIR):
+        sys.exit(1)
+        
+    # Destroy Terraform configuration
+    print("\n🧨 Destroying Terraform infrastructure...")
+    if not run_command(
+        f"terraform destroy -auto-approve -var 'owner_tag={owner_tag}'",
+        cwd=TERRAFORM_DIR,
+    ):
+        sys.exit(1)
+    
+    print("\n✅ Infrastructure destroyed successfully!")
+
+
 def main(prefix=None, run_mode="app"):
     """Main function to deploy infrastructure."""
     # Get owner tag and generate terraform.tfvars
