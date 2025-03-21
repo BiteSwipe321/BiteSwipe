@@ -42,8 +42,8 @@ jobs:
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name biteswipe-mongodb-test-pr${{ env.PR_NUMBER }} \
           --image mongo:latest \
-          --command mongod \
-          --args "--bind_ip_all" \
+          --command "mongod" \
+          --command-args "--bind_ip_all" \
           --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test \
           --target-port 27017 \
           --ingress external \
