@@ -29,16 +29,27 @@ if (dbUri.includes("mongo:")) {
     dbUri = dbUri.replace("mongo:", "localhost:");
 }
 
-// Parse the MongoDB URI to extract database name
-const uriParts = dbUri.split('/');
-const baseUri = uriParts.slice(0, -1).join('/');
-const dbName = uriParts[uriParts.length - 1]?.replace(/_test.*$/, '') || 'biteswipe';
+// Parse the MongoDB URI to extract database name and handle query parameters
+let baseUri, dbName, queryParams = '';
+
+// Check if URI has query parameters
+if (dbUri.includes('?')) {
+    const [uriWithoutParams, params] = dbUri.split('?');
+    queryParams = '?' + params;
+    const uriParts = uriWithoutParams.split('/');
+    baseUri = uriParts.slice(0, -1).join('/');
+    dbName = uriParts[uriParts.length - 1]?.replace(/_test.*$/, '') || 'biteswipe';
+} else {
+    const uriParts = dbUri.split('/');
+    baseUri = uriParts.slice(0, -1).join('/');
+    dbName = uriParts[uriParts.length - 1]?.replace(/_test.*$/, '') || 'biteswipe';
+}
 
 // Generate a random 5-character hash
 const randomHash = Math.random().toString(36).substring(2, 7);
 
-// Create test database URI with random hash
-const testDbUri = `${baseUri}/${dbName}_test_${randomHash}`;
+// Create test database URI with random hash and preserve query parameters
+const testDbUri = `${baseUri}/${dbName}_test_${randomHash}${queryParams}`;
 
 // Connect to MongoDB before tests run
 beforeAll(async () => {
