@@ -1,0 +1,287 @@
+name: Unmocked Tests on Azure VM
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/unmocked-tests-azure-vm.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 18.x
+  RESOURCE_GROUP: CPEN321RSRCGROUP
+  LOCATION: eastus
+  VM_NAME: biteswipe-test-vm-pr${{ github.event.pull_request.number || '999' }}
+  PR_NUMBER: ${{ github.event.pull_request.number || '999' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Verify Azure Connection
+      run: |
+        echo "Verifying Azure connection..."
+        if ! az account show &> /dev/null; then
+          echo "::error::Azure login failed - could not verify account"
+          exit 1
+        fi
+        echo "Azure connection verified successfully"
+        az account show --query name -o tsv
+
+    - name: Create Azure VM for Testing
+      run: |
+        # Check if resource group exists, create if not
+        if ! az group show --name ${{ env.RESOURCE_GROUP }} &> /dev/null; then
+          echo "Creating resource group ${{ env.RESOURCE_GROUP }}..."
+          az group create \
+            --name ${{ env.RESOURCE_GROUP }} \
+            --location ${{ env.LOCATION }}
+        else
+          echo "Resource group ${{ env.RESOURCE_GROUP }} already exists"
+        fi
+        
+        # Create SSH key directory if it doesn't exist
+        mkdir -p ~/.ssh
+        
+        # Create SSH key file from secret
+        echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+        chmod 600 ~/.ssh/id_rsa.pub
+        
+        # Create VM with unique name based on PR number
+        echo "Creating Azure VM for testing: ${{ env.VM_NAME }}"
+        az vm create \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }} \
+          --image UbuntuLTS \
+          --admin-username adminuser \
+          --ssh-key-values ~/.ssh/id_rsa.pub \
+          --public-ip-sku Standard \
+          --size Standard_B2s \
+          --tags PR=${{ env.PR_NUMBER }} Purpose=Testing \
+          --custom-data - << 'CLOUDCONFIG'
+        #cloud-config
+        package_update: true
+        package_upgrade: true
+        packages:
+          - nodejs
+          - npm
+          - gnupg
+          - curl
+        runcmd:
+          # Install MongoDB directly
+          - curl -fsSL https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+          - echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          - apt-get update
+          - apt-get install -y mongodb-org
+          # Configure MongoDB for authentication
+          - echo 'security:\n  authorization: enabled' >> /etc/mongod.conf
+          - systemctl start mongod
+          - systemctl enable mongod
+          # Create test user
+          - sleep 5 && mongosh --eval "db = db.getSiblingDB('admin'); db.createUser({user:'test',pwd:'test',roles:[{role:'root',db:'admin'}]})"
+        CLOUDCONFIG
+        
+        # Get the public IP of the VM
+        VM_IP=$(az vm show \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }} \
+          --show-details \
+          --query publicIps -o tsv)
+        
+        echo "VM_IP=$VM_IP" >> $GITHUB_ENV
+        echo "Azure VM created with IP: $VM_IP"
+        
+        # Wait for cloud-init to complete
+        echo "Waiting for VM to complete initialization..."
+        sleep 60
+
+    - name: Copy Files to VM
+      run: |
+        # Create SSH directory and set permissions
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        
+        # Create SSH private key file from secret
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+        # Wait for SSH to be available
+        echo "Waiting for SSH to be available..."
+        attempt=0
+        max_attempts=10
+        while [ $attempt -lt $max_attempts ]; do
+          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 adminuser@${{ env.VM_IP }} "echo SSH connection successful"; then
+            echo "SSH connection established!"
+            break
+          fi
+          echo "Waiting for SSH... Attempt $((attempt+1))/$max_attempts"
+          sleep 10
+          attempt=$((attempt+1))
+        done
+        
+        if [ $attempt -eq $max_attempts ]; then
+          echo "Failed to establish SSH connection after $max_attempts attempts"
+          exit 1
+        fi
+        
+        # Create project directory on VM
+        ssh -o StrictHostKeyChecking=no adminuser@${{ env.VM_IP }} "mkdir -p ~/biteswipe"
+        
+        # Copy project files to VM
+        echo "Copying project files to VM..."
+        scp -o StrictHostKeyChecking=no -r ./* adminuser@${{ env.VM_IP }}:~/biteswipe/
+
+    - name: Download Firebase credentials to VM
+      run: |
+        # Create a script to download Firebase credentials on the VM
+        cat > download_firebase.sh << 'EOF'
+        #!/bin/bash
+        cd ~/biteswipe/backend
+        
+        # Install Azure CLI
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        
+        # Download Firebase credentials
+        attempt=0
+        max_attempts=5
+        
+        while [ $attempt -lt $max_attempts ]; do
+          echo "Downloading Firebase credentials (attempt $((attempt+1))/$max_attempts)..."
+          
+          # Download the file using Azure CLI with key authentication
+          az storage blob download \
+            --account-name productionstorageaccoun2 \
+            --container-name production-container \
+            --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+            --file biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+            --auth-mode key \
+            --account-key $1 && break
+          
+          # Check if file exists and has content
+          if [ -f biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ] && [ -s biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
+            echo "File downloaded successfully"
+            break
+          fi
+          
+          echo "Download failed. Waiting 5 seconds before retry..."
+          sleep 5
+          attempt=$((attempt + 1))
+        done
+        
+        if [ $attempt -eq $max_attempts ]; then
+          echo "Failed to download after $max_attempts attempts"
+          exit 1
+        fi
+        
+        # Set proper permissions
+        chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+        echo "Firebase credentials downloaded and secured successfully"
+        EOF
+        
+        # Copy the script to VM and execute it
+        chmod +x download_firebase.sh
+        scp -o StrictHostKeyChecking=no download_firebase.sh adminuser@${{ env.VM_IP }}:~/
+        ssh -o StrictHostKeyChecking=no adminuser@${{ env.VM_IP }} "~/download_firebase.sh '${{ secrets.AZURE_STORAGE_KEY }}'"
+
+    - name: Setup and Run Tests
+      run: |
+        # Create a script to run tests with the native MongoDB installation
+        cat > run_tests.sh << 'EOF'
+        #!/bin/bash
+        cd ~/biteswipe
+        
+        # Verify MongoDB is running
+        echo "Verifying MongoDB status..."
+        if ! systemctl is-active --quiet mongod; then
+          echo "MongoDB is not running, attempting to start it..."
+          sudo systemctl start mongod
+          sleep 5
+        fi
+        
+        # Verify MongoDB is accessible
+        echo "Verifying MongoDB connection..."
+        attempt=0
+        max_attempts=10
+        while [ $attempt -lt $max_attempts ]; do
+          if mongosh --eval "db.adminCommand('ping')" > /dev/null 2>&1; then
+            echo "MongoDB is ready!"
+            break
+          fi
+          echo "Waiting for MongoDB... Attempt $((attempt+1))/$max_attempts"
+          sleep 5
+          attempt=$((attempt+1))
+        done
+        
+        if [ $attempt -eq $max_attempts ]; then
+          echo "MongoDB failed to become ready after $max_attempts attempts"
+          sudo systemctl status mongod
+          exit 1
+        fi
+        
+        # Create .env file
+        cd ~/biteswipe/backend
+        cat > .env << EOFINNER
+        PORT=3000
+        DB_URI=mongodb://test:test@localhost:27017/biteswipe?authSource=admin
+        NODE_ENV=test
+        GOOGLE_MAPS_API_KEY=$2
+        FIREBASE_CREDENTIALS_JSON_PATHNAME=/home/adminuser/biteswipe/backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+        EOFINNER
+        
+        # Display .env file for verification
+        echo "Created .env file:"
+        cat .env
+        
+        # Install dependencies
+        echo "Installing dependencies..."
+        npm ci
+        
+        # Run tests
+        echo "Running unmocked tests with coverage..."
+        npm run test:coverage:unmocked
+        
+        # Store the exit code
+        TEST_EXIT_CODE=$?
+        
+        # Return the test exit code
+        exit $TEST_EXIT_CODE
+        EOF
+        
+        # Copy the script to VM and execute it
+        chmod +x run_tests.sh
+        scp -o StrictHostKeyChecking=no run_tests.sh adminuser@${{ env.VM_IP }}:~/
+        ssh -o StrictHostKeyChecking=no adminuser@${{ env.VM_IP }} "~/run_tests.sh '${{ env.PR_NUMBER }}' '${{ secrets.GOOGLE_MAPS_API_KEY }}'"
+
+    - name: Cleanup Azure VM
+      if: always()
+      run: |
+        echo "Cleaning up Azure VM..."
+        # Delete the VM and its resources
+        az vm delete \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }} \
+          --yes
+        
+        # Delete the associated resources
+        az network nsg delete \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }}NSG
+        
+        az network public-ip delete \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }}PublicIP
+        
+        az network vnet delete \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.VM_NAME }}VNET
+        
+        echo "Azure VM cleanup completed"
