@@ -121,34 +121,34 @@ jobs:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     - name: Download Firebase Credentials
+      working-directory: ${{ github.workspace }}
       run: |
         # Function to download with retries
         download_with_retry() {
-          max_attempts=5
+          max_attempts=3
           attempt=1
           while [ $attempt -le $max_attempts ]; do
             echo "Attempt $attempt of $max_attempts to download Firebase credentials..."
             
-            # Verify Azure login status
-            echo "Verifying Azure login status..."
-            az account show || { echo "Azure login required"; return 1; }
-            
-            # Try to download using Azure CLI with current authentication
+            # Create directory if it doesn't exist
+            mkdir -p backend
+
+            # Try to download using Azure CLI with key authentication
             if az storage blob download \
-                --account-name productionstorageaccoun2 \
-                --container-name secrets \
-                --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-                --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
-                --auth-mode login; then
-                # Verify the file exists and is not empty
-                if [ -s backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
-                  echo "Download successful and file is valid!"
-                  return 0
-                else
-                  echo "Download succeeded but file is empty or missing!"
-                  rm -f backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-                  return 1
-                fi
+              --account-name productionstorageaccoun2 \
+              --container-name production-container \
+              --name biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+              --file backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json \
+              --auth-mode key 2>/dev/null; then
+              # Verify the file exists and is not empty
+              if [ -s backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json ]; then
+                echo "Download successful and file is valid!"
+                return 0
+              else
+                echo "Download succeeded but file is empty or missing!"
+                rm -f backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+                return 1
+              fi
             fi
             
             echo "Download failed. Waiting 5 seconds before retry..."
@@ -161,11 +161,12 @@ jobs:
 
         # Try to download with retries
         if download_with_retry; then
-            chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-            echo "Firebase credentials downloaded and secured successfully"
+          # Set proper permissions
+          chmod 600 backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
+          echo "Firebase credentials downloaded and secured successfully"
         else
-            echo "Failed to download Firebase credentials after all retries"
-            exit 1
+          echo "Failed to download Firebase credentials after all retries"
+          exit 1
         fi
 
     - name: Create .env file
@@ -176,27 +177,10 @@ jobs:
         echo "DB_URI=${{ env.MONGODB_URI }}" >> .env
         echo "NODE_ENV=test" >> .env
         echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
-        echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
+        echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" >> .env
         
         echo "Contents of .env file (redacted):"
         cat .env | sed 's/=.*/=REDACTED/g'
-        
-        # Verify Firebase credentials file exists
-        if [ -f "biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" ]; then
-          echo "Firebase credentials file exists in backend directory"
-          ls -la biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-        else
-          echo "WARNING: Firebase credentials file not found in backend directory!"
-          echo "Looking for file in parent directory..."
-          if [ -f "../backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" ]; then
-            echo "Found Firebase credentials in ../backend directory, copying to current directory"
-            cp ../backend/biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json .
-            chmod 600 biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json
-          else
-            echo "ERROR: Firebase credentials file not found in any expected location!"
-            find .. -name "biteswipe-132f1-firebase-adminsdk-fbsvc-76c5bb6fe5.json" -type f 2>/dev/null || echo "No Firebase credentials file found in parent directories"
-          fi
-        fi
       
     - name: Run unmocked tests
       working-directory: ./backend
