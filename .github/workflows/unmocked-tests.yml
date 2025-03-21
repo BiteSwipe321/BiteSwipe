@@ -49,7 +49,6 @@ jobs:
           --env-vars MONGO_INITDB_ROOT_USERNAME=test MONGO_INITDB_ROOT_PASSWORD=test \
           --target-port 27017 \
           --ingress external \
-          --registry-server docker.io \
           --query properties.configuration.ingress.fqdn
       # Azure login is already done at the beginning of the job
 
