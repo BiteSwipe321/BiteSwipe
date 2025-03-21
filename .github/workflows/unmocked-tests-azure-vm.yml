@@ -1,27 +1,17 @@
-name: Unmocked Tests on Azure VM
+name: Azure VM Test
 
 on:
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/unmocked-tests-azure-vm.yml'
   workflow_dispatch:
 
 env:
-  NODE_VERSION: 18.x
   RESOURCE_GROUP: CPEN321RSRCGROUP
   LOCATION: eastus
-  VM_NAME: biteswipe-test-vm-pr${{ github.event.pull_request.number || '999' }}
-  PR_NUMBER: ${{ github.event.pull_request.number || '999' }}
+  VM_NAME: biteswipe-test-vm-${{ github.run_number }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
     - name: Azure Login
       uses: azure/login@v1
       with:
@@ -38,6 +28,7 @@ jobs:
         az account show --query name -o tsv
 
     - name: Create Azure VM for Testing
+      id: create_vm
       run: |
         # Check if resource group exists, create if not
         if ! az group show --name ${{ env.RESOURCE_GROUP }} &> /dev/null; then
@@ -56,7 +47,7 @@ jobs:
         echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
         chmod 600 ~/.ssh/id_rsa.pub
         
-        # Create VM with unique name based on PR number
+        # Create VM with unique name based on run number
         echo "Creating Azure VM for testing: ${{ env.VM_NAME }}"
         az vm create \
           --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -66,31 +57,7 @@ jobs:
           --ssh-key-values ~/.ssh/id_rsa.pub \
           --public-ip-sku Standard \
           --size Standard_B2s \
-          --tags PR=${{ env.PR_NUMBER }} Purpose=Testing \
-          --custom-data - << 'CLOUDCONFIG'
-        #cloud-config
-        package_update: true
-        package_upgrade: true
-        packages:
-          - nodejs
-          - npm
-          - gnupg
-          - curl
-        runcmd:
-          # Install MongoDB directly for Ubuntu 22.04
-          - wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
-          - echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
-          - apt-get update
-          - apt-get install -y mongodb-org
-          # Configure MongoDB for authentication
-          - mkdir -p /data/db
-          - chown -R mongodb:mongodb /data/db
-          - echo 'security:\n  authorization: enabled' >> /etc/mongod.conf
-          - systemctl start mongod
-          - systemctl enable mongod
-          # Create test user
-          - sleep 10 && mongosh --eval "db = db.getSiblingDB('admin'); db.createUser({user:'test',pwd:'test',roles:[{role:'root',db:'admin'}]})"
-        CLOUDCONFIG
+          --tags vm-name=${{ env.VM_NAME }}
         
         # Get the public IP of the VM
         VM_IP=$(az vm show \
@@ -101,46 +68,22 @@ jobs:
         
         echo "VM_IP=$VM_IP" >> $GITHUB_ENV
         echo "Azure VM created with IP: $VM_IP"
-        
-        # Wait for cloud-init to complete
-        echo "Waiting for VM to complete initialization..."
-        sleep 60
 
     - name: Cleanup Azure VM
       if: always()
       run: |
         echo "Cleaning up Azure VM..."
         
-        # Delete the VM first
-        echo "Deleting VM..."
+        # Get a list of all resources associated with the VM
+        echo "Listing resources to clean up..."
+        RESOURCES=$(az resource list --tag "vm-name=${{ env.VM_NAME }}" --query "[].id" -o tsv)
+        
+        # Delete the VM with --force-deletion to clean up all resources
+        echo "Deleting VM with force-deletion..."
         az vm delete \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name ${{ env.VM_NAME }} \
-          --yes
-        
-        # Delete the network interface
-        echo "Deleting network interface..."
-        az network nic delete \
-          --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }}VMNic
-        
-        # Delete the network security group
-        echo "Deleting network security group..."
-        az network nsg delete \
-          --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }}NSG
-        
-        # Delete the public IP
-        echo "Deleting public IP..."
-        az network public-ip delete \
-          --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }}PublicIP
-        
-        # Delete the disk
-        echo "Deleting OS disk..."
-        az disk delete \
-          --resource-group ${{ env.RESOURCE_GROUP }} \
-          --name ${{ env.VM_NAME }}_OsDisk_1_* \
-          --yes || true
+          --yes \
+          --force-deletion all
         
         echo "Azure VM cleanup completed"
