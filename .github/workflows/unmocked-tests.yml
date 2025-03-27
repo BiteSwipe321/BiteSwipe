@@ -2,9 +2,8 @@ name: "Unmocked Tests"
 
 on:
   pull_request:
+    branches: [main, develop, master]
     types: [opened, synchronize, reopened]
-    branches:
-      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

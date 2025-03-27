@@ -2,10 +2,8 @@ name: Mocked Tests
 
 on:
   pull_request:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/mocked-tests.yml"
+    branches: [main, develop, master]
+    types: [opened, synchronize, reopened]
 
 jobs:
   run-mocked-tests:
