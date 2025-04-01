@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import mongoose, { Mongoose } from 'mongoose';
 import { createApp } from './app';
+import path from 'path';
 
 // Configure mongoose
 mongoose.set('strictQuery', true);
@@ -20,6 +21,7 @@ if (!dbUrl) {
 console.log('\n=== Server Configuration ===');
 console.log(`HTTP Port: ${port}`);
 console.log(`Environment: ${nodeEnv}`);
+
 console.log('=========================\n');
 
 // TODO : attempted to fix the codacy warning but could not. 
