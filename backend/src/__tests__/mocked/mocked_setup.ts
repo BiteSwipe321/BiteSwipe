@@ -7,6 +7,9 @@ config({ path: path.join(__dirname, "test.env") });
 process.env.NODE_ENV = 'test';
 process.env.TEST_TYPE = 'mocked';
 
+// Import auth middleware mock
+import './auth_middleware_mock';
+
 // ---------------------------------------------------------
 // Mongoose
 //
