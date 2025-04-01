@@ -4,6 +4,11 @@ import { OAuth2Client } from 'google-auth-library';
 // Create a new OAuth client using your web client ID
 // This should match the one used in the Android app
 const CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID;
+
+if (!CLIENT_ID) {
+  throw new Error('GOOGLE_WEB_CLIENT_ID environment variable is not set');
+}
+
 const client = new OAuth2Client(CLIENT_ID);
 
 // Extend the Express Request type to include user information
@@ -17,6 +22,16 @@ declare global {
 }
 
 /**
+ * Helper function to send authentication error responses
+ */
+const sendAuthError = (res: Response, message: string) => {
+  return res.status(401).json({
+    error: 'Authentication required',
+    message
+  });
+};
+
+/**
  * Middleware to verify Google ID tokens
  * Extracts the token from the Authorization header and verifies it
  */
@@ -27,18 +42,12 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
     
     // If no auth header is present, return 401 Unauthorized
     if (!authHeader) {
-      return res.status(401).json({ 
-        error: 'Authentication required',
-        message: 'No authorization header present'
-      });
+      return sendAuthError(res, 'No authorization header present');
     }
 
     // Check if it's a Bearer token
     if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ 
-        error: 'Authentication required',
-        message: 'Invalid authorization format, Bearer token required'
-      });
+      return sendAuthError(res, 'Invalid authorization format, Bearer token required');
     }
 
     // Extract the token
@@ -54,10 +63,7 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
     const payload = ticket.getPayload();
     
     if (!payload) {
-      return res.status(401).json({ 
-        error: 'Authentication failed',
-        message: 'Invalid token payload'
-      });
+      return sendAuthError(res, 'Invalid token payload');
     }
     
     // Extract user information
@@ -72,10 +78,7 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
     next();
   } catch (error) {
     console.error('Token verification failed:', error);
-    return res.status(401).json({ 
-      error: 'Authentication failed',
-      message: 'Invalid or expired token'
-    });
+    return sendAuthError(res, 'Invalid or expired token');
   }
 };
 
@@ -85,7 +88,7 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
  */
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (!req.userId) {
-    return res.status(401).json({ error: 'Authentication required' });
+    return sendAuthError(res, 'User not authenticated');
   }
   next();
 };
