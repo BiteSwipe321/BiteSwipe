@@ -34,12 +34,13 @@ describe('SessionManager', () => {
       // Verify the join code format
       expect(joinCode).toMatch(/^[A-Z0-9]{5}$/);
       
-      // Verify Session.findOne was called - completely avoiding unbound method references
+      // Verify Session.findOne was called - using a direct verification approach
       const expectedPattern = { joinCode: expect.any(String), status: { $ne: 'COMPLETED' } };
       const matcher = expect.objectContaining(expectedPattern);
-      // Use type assertion instead of jest.mocked to avoid unbound method warning
-      const mockFn = Session.findOne as jest.Mock;
-      expect(mockFn).toHaveBeenCalledWith(matcher);
+      // Access the mock calls directly without referencing the method
+      const mockCalls = (Session.findOne as jest.Mock).mock.calls;
+      expect(mockCalls.length).toBeGreaterThan(0);
+      expect(mockCalls[0][0]).toEqual(matcher);
     });
   });
 
@@ -63,11 +64,12 @@ describe('SessionManager', () => {
       // Verify the result
       expect(result).toEqual(mockSession);
       
-      // Verify Session.findById was called with the correct ID - completely avoiding unbound method references
+      // Verify Session.findById was called with the correct ID - using a direct verification approach
       const idMatcher = expect.any(Object);
-      // Use type assertion instead of jest.mocked to avoid unbound method warning
-      const mockFindById = Session.findById as jest.Mock;
-      expect(mockFindById).toHaveBeenCalledWith(idMatcher);
+      // Access the mock calls directly without referencing the method
+      const mockCalls = (Session.findById as jest.Mock).mock.calls;
+      expect(mockCalls.length).toBeGreaterThan(0);
+      expect(mockCalls[0][0]).toEqual(idMatcher);
     });
 
     it('should throw an error when session is not found', async () => {
