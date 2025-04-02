@@ -35,11 +35,9 @@ describe('SessionManager', () => {
       expect(joinCode).toMatch(/^[A-Z0-9]{5}$/);
       
       // Verify Session.findOne was called - using direct reference to the mock function
+      const objectMatcher = { joinCode: expect.any(String), status: { $ne: 'COMPLETED' } };
       expect(jest.mocked(Session.findOne)).toHaveBeenCalledWith(
-        expect.objectContaining({
-          joinCode: expect.any(String),
-          status: { $ne: 'COMPLETED' }
-        })
+        expect.objectContaining(objectMatcher)
       );
     });
   });
