@@ -12,7 +12,6 @@ if (!CLIENT_ID) {
 const client = new OAuth2Client(CLIENT_ID);
 
 // Extend the Express Request type to include user information
-import 'express';
 
 declare module 'express' {
   interface Request {

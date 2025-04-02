@@ -1,5 +1,4 @@
-import { beforeAll } from '@jest/globals';
-import supertest, { SuperTest, Test } from 'supertest';
+import supertest from 'supertest';
 import { Express } from 'express';
 import { getGoogleAuthToken } from './google_auth_helper';
 
@@ -35,7 +34,7 @@ export const setupGoogleAuth = async (): Promise<void> => {
  * @param app - The Express application to test
  * @returns A supertest agent that automatically includes the auth token in all requests
  */
-export function createAuthenticatedAgent(app: Express): any {
+export function createAuthenticatedAgent(app: Express): unknown {
   // Create a standard supertest agent
   const agent = supertest(app);
   
@@ -50,9 +49,10 @@ export function createAuthenticatedAgent(app: Express): any {
         'get', 'post', 'put', 'delete', 'patch', 'head', 'options'
       ].includes(prop as string)) {
         // Return a wrapped function that adds the auth header
-        return function(...args: any[]) {
+        return function(...args: unknown[]) {
           // Call the original method to get the request
-          const request = (originalProp as Function).apply(target, args);
+          // Using Function.prototype.apply to preserve 'this' context
+          const request = Function.prototype.apply.call(originalProp, target, args);
           
           // Add the auth header if we have a token
           if (googleAuthToken) {

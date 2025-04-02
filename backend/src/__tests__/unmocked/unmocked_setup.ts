@@ -2,12 +2,11 @@ import mongoose from "mongoose";
 import { config } from "dotenv";
 import path from "path";
 import { beforeAll, afterAll } from "@jest/globals";
-import supertest from "supertest";
 import { setupGoogleAuth, createAuthenticatedAgent } from "./test_setup_auth";
 import { createApp } from "../../app";
 
 // Export the authenticated agent for use in tests
-export let authenticatedAgent: any;
+export let authenticatedAgent: unknown;
 
 // Load test environment variables
 config({ path: path.join(__dirname, "../../../.env") });

@@ -1,12 +1,9 @@
 import { SessionManager } from '../../services/sessionManager';
 import { RestaurantService } from '../../services/restaurantService';
 import { Session } from '../../models/session';
-import { Types } from 'mongoose';
-import { UserModel } from '../../models/user';
 
 // Mock dependencies
 jest.mock('../../models/session');
-jest.mock('../../models/user');
 jest.mock('../../services/restaurantService');
 
 describe('SessionManager', () => {
@@ -30,13 +27,13 @@ describe('SessionManager', () => {
       (Session.findOne as jest.Mock).mockResolvedValue(null);
       
       // Call the private method using type assertion
-      const joinCode = await (sessionManager as any).generateUniqueJoinCode();
+      const joinCode = await (sessionManager as unknown).generateUniqueJoinCode();
       
       // Verify the join code format
       expect(joinCode).toMatch(/^[A-Z0-9]{5}$/);
       
-      // Verify Session.findOne was called
-      expect(Session.findOne).toHaveBeenCalledWith(
+      // Verify Session.findOne was called - using mock property to avoid unbound method issue
+      expect(Session.findOne as jest.Mock).toHaveBeenCalledWith(
         expect.objectContaining({
           joinCode: expect.any(String),
           status: { $ne: 'COMPLETED' }
@@ -65,8 +62,8 @@ describe('SessionManager', () => {
       // Verify the result
       expect(result).toEqual(mockSession);
       
-      // Verify Session.findById was called with the correct ID
-      expect(Session.findById).toHaveBeenCalledWith(expect.any(Object));
+      // Verify Session.findById was called with the correct ID - using mock property to avoid unbound method issue
+      expect(Session.findById as jest.Mock).toHaveBeenCalledWith(expect.any(Object));
     });
 
     it('should throw an error when session is not found', async () => {
