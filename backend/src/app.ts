@@ -27,7 +27,7 @@ export function createApp(): Express {
   app.use(express.urlencoded({ extended: true }));
 
   // Apply Google token verification middleware to all routes
-  app.use(verifyGoogleToken);
+  app.use(asyncHandler(verifyGoogleToken));
 
   // Initialize services
   const restaurantService = new RestaurantService();

@@ -59,7 +59,7 @@ describe("POST /users - Unmocked", () => {
     expect(res.status).toBe(404)
 
     // Use the same email that's set in the auth middleware
-    const testEmail = process.env.GOOGLE_TEST_EMAIL || "byteswiper@gmail.com";
+    const testEmail = process.env.GOOGLE_TEST_EMAIL ?? "byteswiper@gmail.com";
     const userData = {
       email: testEmail,
       displayName: "Test User"
@@ -84,7 +84,7 @@ describe("POST /users - Unmocked", () => {
    */
   test("should return 409 when creating user with existing email", async () => {
     // Use the same email that's set in the auth middleware
-    const testEmail = process.env.GOOGLE_TEST_EMAIL || "byteswiper@gmail.com";
+    const testEmail = process.env.GOOGLE_TEST_EMAIL ?? "byteswiper@gmail.com";
     const userData = {
       email: testEmail,
       displayName: "Duplicate User"
@@ -148,7 +148,7 @@ describe("POST /users - Unmocked", () => {
     await mongoose.connection.close();
 
     // Use the same email that's set in the auth middleware
-    const testEmail = process.env.GOOGLE_TEST_EMAIL || "byteswiper@gmail.com";
+    const testEmail = process.env.GOOGLE_TEST_EMAIL ?? "byteswiper@gmail.com";
     const userData = {
       email: testEmail,
       displayName: "Error Test User"

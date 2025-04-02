@@ -150,7 +150,7 @@ describe('POST /sessions/:sessionId/start - Unmocked', () => {
         time: seconds / 60
       })
       .expect('Content-Type', /json/)
-      .expect(500);  // The controller returns 500 for all errors
+      .expect(500);
 
     expect(response.body).toHaveProperty('error');
 

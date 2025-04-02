@@ -12,12 +12,12 @@ if (!CLIENT_ID) {
 const client = new OAuth2Client(CLIENT_ID);
 
 // Extend the Express Request type to include user information
-declare global {
-  namespace Express {
-    interface Request {
-      userId?: string;
-      userEmail?: string;
-    }
+import 'express';
+
+declare module 'express' {
+  interface Request {
+    userId?: string;
+    userEmail?: string;
   }
 }
 
@@ -45,8 +45,10 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
     if (!req.userEmail) {
       throw new Error('GOOGLE_TEST_EMAIL environment variable is not set');
     }
-    console.log(`Test mode: Authentication bypassed. Using test user: ${req.userEmail}`);
-    return next();
+    // Log a fixed message instead of using dynamic content
+    console.log('Test mode: Authentication bypassed');
+    next();
+    return;
   }
   
   try {
@@ -87,7 +89,8 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
     req.userId = userId;
     req.userEmail = email;
     
-    console.log(`Authenticated user: ${email}`);
+    // Log a fixed message instead of using dynamic content
+    console.log('User successfully authenticated');
     next();
   } catch (error) {
     console.error('Token verification failed:', error);
