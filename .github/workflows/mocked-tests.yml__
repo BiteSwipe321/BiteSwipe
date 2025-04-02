@@ -90,6 +90,7 @@ jobs:
           echo "TEST_TYPE=mocked" >> .env
           echo "GOOGLE_MAPS_API_KEY=mock_key" >> .env
           echo "GOOGLE_WEB_CLIENT_ID=mock_client_id" >> .env
+          echo "GOOGLE_TEST_EMAIL=${{ secrets.GOOGLE_TEST_EMAIL }}" >> backend/.env
           echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=./backend/biteswipe-452501-firebase-adminsdk-fbsvc-f7b58ac1e2.json" >> .env
 
       - name: Run mocked tests

@@ -211,6 +211,13 @@ locals {
     "GOOGLE_WEB_CLIENT_ID=", 
     ""
   ))
+  
+  # Extract Google Test Email
+  google_test_email = trimspace(replace(
+    regexall("GOOGLE_TEST_EMAIL=[^\n]*", local.env_content)[0],
+    "GOOGLE_TEST_EMAIL=", 
+    ""
+  ))
 }
 
 # Add Azure storage blob data source and download step for Firebase cert
@@ -346,6 +353,7 @@ PORT=3000
 DB_URI=mongodb://mongo:27017/biteswipe
 GOOGLE_MAPS_API_KEY=${local.google_maps_api_key}
 GOOGLE_WEB_CLIENT_ID=${local.google_web_client_id}
+GOOGLE_TEST_EMAIL=${local.google_test_email}
 FIREBASE_CREDENTIALS_JSON_PATHNAME=$BACKEND_REMOTE_PATH/biteswipe-452501-firebase-adminsdk-fbsvc-f7b58ac1e2.json
 ENVFILE
       

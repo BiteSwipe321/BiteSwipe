@@ -57,6 +57,7 @@ jobs:
           echo "NODE_ENV=test" >> backend/.env
           echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> backend/.env
           echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> backend/.env
+          echo "GOOGLE_TEST_EMAIL=${{ secrets.GOOGLE_TEST_EMAIL }}" >> backend/.env
           echo "FIREBASE_CREDENTIALS_JSON_PATHNAME=/app/backend/biteswipe-452501-firebase-adminsdk-fbsvc-f7b58ac1e2.json" >> backend/.env
 
       - name: Deploy New Infrastructure
