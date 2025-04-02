@@ -34,9 +34,8 @@ describe('SessionManager', () => {
       // Verify the join code format
       expect(joinCode).toMatch(/^[A-Z0-9]{5}$/);
       
-      // Verify Session.findOne was called - using a different approach to avoid unbound method issue
-      const mockFindOne = Session.findOne as jest.Mock;
-      expect(mockFindOne).toHaveBeenCalledWith(
+      // Verify Session.findOne was called - using direct reference to the mock function
+      expect(jest.mocked(Session.findOne)).toHaveBeenCalledWith(
         expect.objectContaining({
           joinCode: expect.any(String),
           status: { $ne: 'COMPLETED' }
@@ -65,9 +64,8 @@ describe('SessionManager', () => {
       // Verify the result
       expect(result).toEqual(mockSession);
       
-      // Verify Session.findById was called with the correct ID - using a different approach to avoid unbound method issue
-      const mockFindById = Session.findById as jest.Mock;
-      expect(mockFindById).toHaveBeenCalledWith(expect.any(Object));
+      // Verify Session.findById was called with the correct ID - using direct reference to the mock function
+      expect(jest.mocked(Session.findById)).toHaveBeenCalledWith(expect.any(Object));
     });
 
     it('should throw an error when session is not found', async () => {
