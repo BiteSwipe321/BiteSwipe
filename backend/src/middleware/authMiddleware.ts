@@ -34,8 +34,21 @@ const sendAuthError = (res: Response, message: string) => {
 /**
  * Middleware to verify Google ID tokens
  * Extracts the token from the Authorization header and verifies it
+ * In test mode, authentication is bypassed
  */
 export const verifyGoogleToken = async (req: Request, res: Response, next: NextFunction) => {
+  // Skip authentication in test mode
+  if (process.env.NODE_ENV === 'test' && process.env.TEST_TYPE === 'unmocked') {
+    // Set default test user information
+    req.userId = 'test-user-id';
+    req.userEmail = process.env.GOOGLE_TEST_EMAIL;
+    if (!req.userEmail) {
+      throw new Error('GOOGLE_TEST_EMAIL environment variable is not set');
+    }
+    console.log(`Test mode: Authentication bypassed. Using test user: ${req.userEmail}`);
+    return next();
+  }
+  
   try {
     // Get the auth header
     const authHeader = req.headers.authorization;
@@ -53,7 +66,7 @@ export const verifyGoogleToken = async (req: Request, res: Response, next: NextF
     // Extract the token
     const token = authHeader.split(' ')[1];
     
-    // Verify the token
+    // Verify the token with Google (for non-test tokens or if test token parsing failed)
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: CLIENT_ID,
