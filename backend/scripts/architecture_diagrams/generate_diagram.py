@@ -82,6 +82,10 @@ with Diagram("BiteSwipe Backend Architecture", show=False, filename=OUTPUT_PATH,
                 # Azure Infrastructure Services
                 with Cluster("Azure Infrastructure Services", graph_attr={"style": "dashed", "margin": "20", "bgcolor": "#E6E6FF", "pencolor": "#8E44AD", "penwidth": "2.0"}):
                     azure_services = General("Supporting Services\n(Network, Security, etc.)")
+                    
+                    # Azure Storage as a cluster
+                    with Cluster("Azure Storage", graph_attr={"bgcolor": "#E0EAFF", "pencolor": "#3498DB", "penwidth": "1.5"}):
+                        firebase_creds = Storage("Firebase Credentials\n(JSON)")
                 
                 # Virtual Machine with Docker Compose inside
                 with Cluster("Azure VM (Linux)", graph_attr={"bgcolor": "#FFF0E6", "pencolor": "#E67E22", "penwidth": "2.0"}):
@@ -113,6 +117,8 @@ with Diagram("BiteSwipe Backend Architecture", show=False, filename=OUTPUT_PATH,
                             # Connect containers to each other
                             app_container >> Edge(label="connects to", color="#2980B9", fontcolor="#2980B9", penwidth="1.5") >> mongo_container
                             nginx_container >> Edge(label="proxies to", color="#2980B9", fontcolor="#2980B9", penwidth="1.5") >> app_container
+                            
+
                         
                         # Connect Docker Compose to all containers with clearer labels and adjusted positioning
                         # Use different edge styles to help with positioning
@@ -128,6 +134,12 @@ with Diagram("BiteSwipe Backend Architecture", show=False, filename=OUTPUT_PATH,
     # Deployment Flow
     repo_secrets >> Edge(label="provides secrets", color="#8E44AD", fontcolor="#8E44AD", penwidth="1.5") >> github_actions
     github_actions >> Edge(label="triggers", color="#27AE60", fontcolor="#27AE60", penwidth="1.5") >> terraform
+    
+    # GitHub Actions downloads Firebase credentials
+    firebase_creds >> Edge(label="downloaded by", color="#E67E22", fontcolor="#E67E22", penwidth="1.5") >> github_actions
+    
+    # Firebase credentials are passed to the app container
+    github_actions >> Edge(label="passes credentials to", color="#E67E22", fontcolor="#E67E22", penwidth="1.5", style="dashed") >> app_container
     
     terraform >> Edge(label="provisions", color="#27AE60", fontcolor="#27AE60", penwidth="1.5") >> azure_vm_icon
     env_file >> Edge(label="configures", color="#D35400", fontcolor="#D35400", penwidth="1.5") >> terraform

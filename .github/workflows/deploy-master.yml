@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - abdul/*
       - develop
 
 concurrency:
@@ -66,9 +65,11 @@ jobs:
           chmod +x import_resource_group.sh
           echo "::group::Deploying infrastructure"
           python3 deploy_infra.py
+          
           DEPLOY_EXIT_CODE=$?
           echo "::endgroup::"
           echo "deploy_status=$DEPLOY_EXIT_CODE" >> $GITHUB_OUTPUT
+          
           if [ $DEPLOY_EXIT_CODE -ne 0 ]; then
             echo "::error::Infrastructure deployment failed with exit code $DEPLOY_EXIT_CODE"
             echo "::group::Terraform logs (last 50 lines)"

@@ -5,6 +5,13 @@ on:
     branches: [main, develop, master]
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   run-mocked-tests:
     runs-on: ubuntu-latest
