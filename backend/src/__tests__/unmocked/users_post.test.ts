@@ -51,17 +51,16 @@ describe("POST /users - Unmocked", () => {
    */
   test("should create a new user with valid data", async () => {
 
-    // unsupported Http method
+    // unsupported Http methos
+
     const res = await agent
       .post("/user")
       .send({})
     
     expect(res.status).toBe(404)
 
-    // Use the same email that's set in the auth middleware
-    const testEmail = process.env.GOOGLE_TEST_EMAIL ?? "byteswiper@gmail.com";
     const userData = {
-      email: testEmail,
+      email: "test@example.com",
       displayName: "Test User"
     };
 
@@ -83,10 +82,8 @@ describe("POST /users - Unmocked", () => {
    * Expected output: Error message indicating user already exists
    */
   test("should return 409 when creating user with existing email", async () => {
-    // Use the same email that's set in the auth middleware
-    const testEmail = process.env.GOOGLE_TEST_EMAIL ?? "byteswiper@gmail.com";
     const userData = {
-      email: testEmail,
+      email: "duplicate@example.com",
       displayName: "Duplicate User"
     };
 
@@ -147,10 +144,8 @@ describe("POST /users - Unmocked", () => {
     // First disconnect from database to simulate error
     await mongoose.connection.close();
 
-    // Use the same email that's set in the auth middleware
-    const testEmail = process.env.GOOGLE_TEST_EMAIL ?? "byteswiper@gmail.com";
     const userData = {
-      email: testEmail,
+      email: "error@example.com",
       displayName: "Error Test User"
     };
 
